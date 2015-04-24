@@ -7,17 +7,12 @@
 Test case for twisted.mail.imap4
 """
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
 import codecs
 import locale
 import os
 import types
 
-from zope.interface import implements
+from zope.interface import implementer
 
 from twisted.python.filepath import FilePath
 from twisted.mail.imap4 import MessageSet
@@ -31,6 +26,7 @@ from twisted.internet.task import Clock
 from twisted.trial import unittest
 from twisted.python import util, log
 from twisted.python import failure
+from twisted.python.compat import NativeStringIO as StringIO
 
 from twisted.cred.portal import Portal
 from twisted.cred.checkers import InMemoryUsernamePasswordDatabaseDontUse
@@ -970,9 +966,9 @@ class IMAP4HelperTests(unittest.TestCase):
                 self.assertEqual(L, expected,
                                   "len(%r) = %r != %r" % (input, L, expected))
 
-class SimpleMailbox:
-    implements(imap4.IMailboxInfo, imap4.IMailbox, imap4.ICloseableMailbox)
 
+@implementer(imap4.IMailboxInfo, imap4.IMailbox, imap4.ICloseableMailbox)
+class SimpleMailbox:
     flags = ('\\Flag1', 'Flag2', '\\AnotherSysFlag', 'LastFlag')
     messages = []
     mUID = 0
@@ -3391,8 +3387,9 @@ class FakeyServer(imap4.IMAP4Server):
     def sendServerGreeting(self):
         pass
 
+
+@implementer(imap4.IMessage)
 class FakeyMessage(util.FancyStrMixin):
-    implements(imap4.IMessage)
 
     showAttributes = ('headers', 'flags', 'date', 'body', 'uid')
 
@@ -4417,9 +4414,8 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
 
 
 
+@implementer(imap4.ISearchableMailbox)
 class FetchSearchStoreTests(unittest.TestCase, IMAP4HelperMixin):
-    implements(imap4.ISearchableMailbox)
-
     def setUp(self):
         self.expected = self.result = None
         self.server_received_query = None
@@ -4578,8 +4574,9 @@ class FakeMailbox:
         self.args.append((body, flags, date))
         return defer.succeed(None)
 
+
+@implementer(imap4.IMessageFile)
 class FeaturefulMessage:
-    implements(imap4.IMessageFile)
 
     def getFlags(self):
         return 'flags'
@@ -4590,8 +4587,9 @@ class FeaturefulMessage:
     def open(self):
         return StringIO("open")
 
+
+@implementer(imap4.IMessageCopier)
 class MessageCopierMailbox:
-    implements(imap4.IMessageCopier)
 
     def __init__(self):
         self.msgs = []

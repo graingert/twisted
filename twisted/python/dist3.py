@@ -207,6 +207,7 @@ testModules = [
     "twisted.logger.test.test_observer",
     "twisted.logger.test.test_stdlib",
     "twisted.logger.test.test_util",
+    "twisted.mail.test.test_imap",
     "twisted.names.test.test_cache",
     "twisted.names.test.test_client",
     "twisted.names.test.test_common",
