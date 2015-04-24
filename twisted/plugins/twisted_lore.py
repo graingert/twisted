@@ -1,11 +1,12 @@
 
-from zope.interface import implements
+from zope.interface import implementer
 
 from twisted.lore.scripts.lore import IProcessor
 from twisted.plugin import IPlugin
 
+
+@implementer(IPlugin, IProcessor)
 class _LorePlugin(object):
-    implements(IPlugin, IProcessor)
 
     def __init__(self, name, moduleName, description):
         self.name = name

@@ -6,7 +6,6 @@ Tests for L{twisted.cred.strcred}.
 """
 
 import os
-import StringIO
 
 from twisted import plugin
 from twisted.trial import unittest
@@ -16,6 +15,7 @@ from twisted.python import usage
 from twisted.python.filepath import FilePath
 from twisted.python.fakepwd import UserDatabase
 from twisted.python.reflect import requireModule
+from twisted.python.compat import NativeStringIO as StringIO
 
 try:
     import crypt
@@ -270,7 +270,7 @@ class TestFileDBChecker(unittest.TestCase):
         self.badPass = credentials.UsernamePassword('alice', 'foobar')
         self.badUser = credentials.UsernamePassword('x', 'yz')
         self.filename = self.mktemp()
-        FilePath(self.filename).setContent('admin:asdf\nalice:foo\n')
+        FilePath(self.filename).setContent(b'admin:asdf\nalice:foo\n')
         self.checker = strcred.makeChecker('file:' + self.filename)
 
 
@@ -332,7 +332,7 @@ class TestFileDBChecker(unittest.TestCase):
         should produce a warning.
         """
         oldOutput = cred_file.theFileCheckerFactory.errorOutput
-        newOutput = StringIO.StringIO()
+        newOutput = StringIO()
         cred_file.theFileCheckerFactory.errorOutput = newOutput
         strcred.makeChecker('file:' + self._fakeFilename())
         cred_file.theFileCheckerFactory.errorOutput = oldOutput
@@ -456,7 +456,7 @@ class TestCheckerOptions(unittest.TestCase):
         Test that the --help-auth argument correctly displays all
         available authentication plugins, then exits.
         """
-        newStdout = StringIO.StringIO()
+        newStdout = StringIO()
         options = DummyOptions()
         options.authOutput = newStdout
         self.assertRaises(SystemExit, options.parseOptions, ['--help-auth'])
@@ -469,7 +469,7 @@ class TestCheckerOptions(unittest.TestCase):
         Test that the --help-auth-for argument will correctly display
         the help file for a particular authentication plugin.
         """
-        newStdout = StringIO.StringIO()
+        newStdout = StringIO()
         options = DummyOptions()
         options.authOutput = newStdout
         self.assertRaises(
@@ -531,7 +531,7 @@ class TestLimitingInterfaces(unittest.TestCase):
 
     def setUp(self):
         self.filename = self.mktemp()
-        file(self.filename, 'w').write('admin:asdf\nalice:foo\n')
+        open(self.filename, 'w').write('admin:asdf\nalice:foo\n')
         self.goodChecker = checkers.FilePasswordDB(self.filename)
         self.badChecker = checkers.FilePasswordDB(
             self.filename, hash=self._hash)
@@ -653,7 +653,7 @@ class TestLimitingInterfaces(unittest.TestCase):
                 break
         self.assertNotIdentical(invalidFactory, None)
         # Capture output and make sure the warning is there
-        newStdout = StringIO.StringIO()
+        newStdout = StringIO()
         options.authOutput = newStdout
         self.assertRaises(SystemExit, options.parseOptions,
                           ['--help-auth-type', 'anonymous'])

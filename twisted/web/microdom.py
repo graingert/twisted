@@ -20,13 +20,17 @@ Microdom mainly focuses on working with HTML and XHTML.
 
 # System Imports
 import re
-from cStringIO import StringIO
-
-from types import StringTypes, UnicodeType
+from functools import partial
 
 # Twisted Imports
 from twisted.web.sux import XMLParser, ParseError
 from twisted.python.util import InsensitiveDict
+from twisted.python.compat import (
+    NativeStringIO as StringIO,
+    unicode as UnicodeType,
+)
+
+StringTypes = (bytes, UnicodeType)
 
 
 def getElementsByTagName(iNode, name):
@@ -430,7 +434,8 @@ def _genprefix():
     while True:
         yield  'p' + str(i)
         i = i + 1
-genprefix = _genprefix().next
+
+genprefix = partial(next, _genprefix())
 
 class _Attr(CharacterData):
     "Support class for getAttributeNode."

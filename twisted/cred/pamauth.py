@@ -34,7 +34,7 @@ def pamAuthenticateThread(service, user, conv):
         if done[0]:
             return done[1]
         else:
-            raise done[1].type, done[1].value
+            raise done[1].type(done[1].value)
 
     return callIntoPAM(service, user, _conv)
 
@@ -68,7 +68,7 @@ def defConv(items):
             p = raw_input(message)
             resp.append((p, 0))
         elif kind in (3,4):
-            print message
+            print(message)
             resp.append(("", 0))
         else:
             return defer.fail('foo')

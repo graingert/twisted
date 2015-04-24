@@ -4,8 +4,7 @@
 
 #
 import sys, os
-import tree #todo: get rid of this later
-import indexer
+from twisted.lore import indexer
 
 class NoProcessorError(Exception):
     pass
@@ -41,6 +40,7 @@ class Walker:
                 self.walked.append((linkrel, fullpath))
                 
     def generate(self):
+        from twisted.lore import tree #todo: get rid of this later
         i = 0
         indexer.clearEntries()
         tree.filenum = 0
@@ -51,7 +51,7 @@ class Walker:
             self.percentdone((float(i) / len(self.walked)), fname)
             try:
                 self.df(fullpath, linkrel)
-            except ProcessingFailure, e:
+            except ProcessingFailure as e:
                 self.failures.append((fullpath, e))
         indexer.generateIndex()
         self.percentdone(1., None)
@@ -67,13 +67,13 @@ class Walker:
         sys.stdout.write(progstat)
         sys.stdout.flush()
         if fname is None:
-            print
+            print('')
 
 class PlainReportingWalker(Walker):
 
     def percentdone(self, percent, fname):
         if fname:
-            print fname
+            print(fname)
 
 class NullReportingWalker(Walker):
 
@@ -87,6 +87,7 @@ def fooAddingGenerator(originalFileName, outputExtension):
     return os.path.splitext(originalFileName)[0]+"foo"+outputExtension
 
 def outputdirGenerator(originalFileName, outputExtension, inputdir, outputdir):
+    from twisted.lore import tree #todo: get rid of this later
     originalFileName = os.path.abspath(originalFileName)
     abs_inputdir = os.path.abspath(inputdir)
     if os.path.commonprefix((originalFileName, abs_inputdir)) != abs_inputdir:
@@ -103,6 +104,7 @@ def getFilenameGenerator(config, outputExt):
                                os.path.abspath(config.get('inputdir')),
                                os.path.abspath(config.get('outputdir'))))
     else:
+        from twisted.lore import tree #todo: get rid of this later
         return tree.getOutputFileName
 
 def getProcessor(module, output, config):

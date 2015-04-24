@@ -8,13 +8,15 @@ LaTeX output support for Lore.
 
 from xml.dom import minidom as dom
 import os.path, re
-from cStringIO import StringIO
-import urlparse
+try:
+    from urllib import parse as urlparse
+except ImportError:
+    import urlparse
 
 from twisted.web import domhelpers
 from twisted.python import procutils
-
-import tree
+from twisted.python.compat import NativeStringIO as StringIO
+from twisted.lore import tree
 
 escapingRE = re.compile(r'([\[\]#$%&_{}^~\\])')
 lowerUpperRE = re.compile(r'([a-z])([A-Z])')

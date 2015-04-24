@@ -3,7 +3,11 @@
 
 
 from itertools import count
-import re, os, cStringIO, time, cgi, urlparse
+import re, os, time, cgi
+try:
+    from urllib import parse as urlparse
+except ImportError:
+    import urlparse
 from xml.dom import minidom as dom
 from xml.sax.handler import ErrorHandler, feature_validation
 from xml.dom.pulldom import SAX2DOM
@@ -12,8 +16,9 @@ from xml.sax.xmlreader import InputSource
 
 from twisted.python import htmlizer
 from twisted.python.filepath import FilePath
+from twisted.python.compat import NativeStringIO as StringIO
 from twisted.web import domhelpers
-import process, latex, indexer, numberer, htmlbook
+from twisted.lore import process, indexer, numberer, htmlbook
 
 
 
@@ -151,6 +156,7 @@ def fontifyPython(document):
 
 
 def fontifyPythonNode(node):
+    from twisted.lore import latex
     """
     Syntax color the given node containing Python source code.
 
@@ -158,12 +164,12 @@ def fontifyPythonNode(node):
 
     @return: C{None}
     """
-    oldio = cStringIO.StringIO()
+    oldio = StringIO()
     latex.getLatexText(node, oldio.write,
                        entities={'lt': '<', 'gt': '>', 'amp': '&'})
-    oldio = cStringIO.StringIO(oldio.getvalue().strip()+'\n')
+    oldio = StringIO(oldio.getvalue().strip()+'\n')
     howManyLines = len(oldio.getvalue().splitlines())
-    newio = cStringIO.StringIO()
+    newio = StringIO()
     htmlizer.filter(oldio, newio, writer=htmlizer.SmallerHTMLWriter)
     lineLabels = _makeLineNumbers(howManyLines)
     newel = dom.parseString(newio.getvalue()).documentElement
@@ -198,7 +204,7 @@ def addPyListings(document, dir):
     for node in domhelpers.findElementsWithAttribute(document, "class",
                                                      "py-listing"):
         filename = node.getAttribute("href")
-        outfile = cStringIO.StringIO()
+        outfile = StringIO()
         lines = map(str.rstrip, open(os.path.join(dir, filename)).readlines())
 
         skip = node.getAttribute('skipLines') or 0
@@ -206,7 +212,7 @@ def addPyListings(document, dir):
         howManyLines = len(lines)
         data = '\n'.join(lines)
 
-        data = cStringIO.StringIO(_removeLeadingTrailingBlankLines(data))
+        data = StringIO(_removeLeadingTrailingBlankLines(data))
         htmlizer.filter(data, outfile, writer=htmlizer.SmallerHTMLWriter)
         sourceNode = dom.parseString(outfile.getvalue()).documentElement
         sourceNode.insertBefore(_makeLineNumbers(howManyLines), sourceNode.firstChild)
@@ -1077,7 +1083,7 @@ def parseFileAndReport(filename, _open=file):
     try:
         try:
             parser.parse(fObj)
-        except IOError, e:
+        except IOError as e:
             raise process.ProcessingFailure(
                 e.strerror + ", filename was '" + filename + "'")
     finally:

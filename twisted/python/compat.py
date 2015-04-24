@@ -23,6 +23,11 @@ from __future__ import division
 import sys, string, socket, struct, inspect
 from io import TextIOBase, IOBase
 
+try:
+    import builtins
+except ImportError:
+    import __builtin__ as builtins
+
 
 if sys.version_info < (3, 0):
     _PY3 = False
@@ -361,6 +366,21 @@ def nativeString(s):
             s.decode("ascii")
     return s
 
+
+if _PY3:
+    exec_ = getattr(builtins, "exec")
+else:
+    def exec_(_code_, _globs_=None, _locs_=None):
+        """Execute code in a namespace."""
+        if _globs_ is None:
+            frame = sys._getframe(1)
+            _globs_ = frame.f_globals
+            if _locs_ is None:
+                _locs_ = frame.f_locals
+            del frame
+        elif _locs_ is None:
+            _locs_ = _globs_
+        exec("""exec _code_ in _globs_, _locs_""")
 
 
 if _PY3:

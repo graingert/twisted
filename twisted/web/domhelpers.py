@@ -6,10 +6,9 @@
 A library for performing interesting tasks with DOM objects.
 """
 
-import StringIO
-
 from twisted.web import microdom
 from twisted.web.microdom import getElementsByTagName, escape, unescape
+from twisted.python.compat import NativeStringIO as StringIO
 # These modules are imported here as a shortcut.
 escape
 getElementsByTagName
@@ -57,7 +56,7 @@ def get(node, nodeId):
     """
     result = _get(node, nodeId)
     if result: return result
-    raise NodeLookupError, nodeId
+    raise NodeLookupError(nodeId)
 
 def getIfExists(node, nodeId):
     """
@@ -253,7 +252,7 @@ def writeNodeData(node, oldio):
 
 
 def getNodeText(node):
-    oldio = StringIO.StringIO()
+    oldio = StringIO()
     writeNodeData(node, oldio)
     return oldio.getvalue()
 

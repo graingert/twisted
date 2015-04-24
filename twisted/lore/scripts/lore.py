@@ -71,12 +71,12 @@ def getProcessor(input, output, config):
         try:
             module = reflect.namedModule(input)
         except ImportError:
-            print '%s: no such input: %s' % (sys.argv[0], input)
+            print('%s: no such input: %s' % (sys.argv[0], input))
             return
     try:
         return process.getProcessor(module, output, config)
-    except process.NoProcessorError, e:
-        print "%s: %s" % (sys.argv[0], e)
+    except process.NoProcessorError as e:
+        print("%s: %s" % (sys.argv[0], e))
 
 
 def getWalker(df, opt):
@@ -131,7 +131,7 @@ def runGivenOptions(opt):
     if walker.failures:
         for (file, errors) in walker.failures:
             for error in errors:
-                print "%s:%s" % (file, error)
+                print("%s:%s" % (file, error))
         return 'Walker failures'
 
 
@@ -139,14 +139,14 @@ def run():
     opt = Options()
     try:
         opt.parseOptions()
-    except usage.UsageError, errortext:
-        print '%s: %s' % (sys.argv[0], errortext)
-        print '%s: Try --help for usage details.' % sys.argv[0]
+    except usage.UsageError as errortext:
+        print('%s: %s' % (sys.argv[0], errortext))
+        print('%s: Try --help for usage details.' % sys.argv[0])
         sys.exit(1)
 
     result = runGivenOptions(opt)
     if result:
-        print result
+        print(result)
         sys.exit(1)
 
 

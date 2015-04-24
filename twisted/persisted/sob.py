@@ -14,14 +14,12 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
-try:
-    import cStringIO as StringIO
-except ImportError:
-    import StringIO
+
 from hashlib import md5
 from twisted.python import log, runtime
+from twisted.python.compat import exec_, NativeStringIO as StringIO
 from twisted.persisted import styles
-from zope.interface import implements, Interface
+from zope.interface import implementer, Interface
 
 # Note:
 # These encrypt/decrypt functions only work for data formats
@@ -58,9 +56,8 @@ class IPersistable(Interface):
         """
 
 
+@implementer(IPersistable)
 class Persistent:
-
-    implements(IPersistable)
 
     style = "pickle"
 
@@ -92,7 +89,7 @@ class Persistent:
         if passphrase is None:
             dumpFunc(self.original, f)
         else:
-            s = StringIO.StringIO()
+            s = StringIO()
             dumpFunc(self.original, s)
             f.write(_encrypt(passphrase, s.getvalue()))
         f.close()
@@ -164,7 +161,7 @@ def load(filename, style, passphrase=None):
     else:
         _load, mode = pickle.load, 'rb'
     if passphrase:
-        fp = StringIO.StringIO(_decrypt(passphrase,
+        fp = StringIO(_decrypt(passphrase,
                                         open(filename, 'rb').read()))
     else:
         fp = open(filename, mode)
@@ -205,9 +202,9 @@ def loadValueFromFile(filename, variable, passphrase=None):
     if passphrase:
         data = fileObj.read()
         data = _decrypt(passphrase, data)
-        exec data in d, d
+        exec_(data, d, d)
     else:
-        exec fileObj in d, d
+        exec_(fileObj, d, d)
     value = d[variable]
     return value
 

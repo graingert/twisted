@@ -595,19 +595,19 @@ class XMLParser(Protocol):
         '''Encountered an opening tag.
 
         Default behaviour is to print.'''
-        print 'begin', name, attributes
+        print(''.join(['begin', name, attributes]))
 
     def gotText(self, data):
         '''Encountered text
 
         Default behaviour is to print.'''
-        print 'text:', repr(data)
+        print(''.join(['text:', repr(data)]))
 
     def gotEntityReference(self, entityRef):
         '''Encountered mnemonic entity reference
 
         Default behaviour is to print.'''
-        print 'entityRef: &%s;' % entityRef
+        print('entityRef: &%s;' % entityRef)
 
     def gotComment(self, comment):
         '''Encountered comment.
@@ -627,10 +627,10 @@ class XMLParser(Protocol):
         This is really grotty: it basically just gives you everything between
         '<!DOCTYPE' and '>' as an argument.
         """
-        print '!DOCTYPE', repr(doctype)
+        print(''.join(['!DOCTYPE', repr(doctype)]))
 
     def gotTagEnd(self, name):
         '''Encountered closing tag
 
         Default behaviour is to print.'''
-        print 'end', name
+        print(''.join(['end', name]))
