@@ -377,7 +377,7 @@ class DigestCredentialFactory(object):
 @implementer(IUsernameHashedPassword)
 class CramMD5Credentials:
 
-    challenge = ''
+    challenge = b''
     response = ''
 
     def __init__(self, host=None):
@@ -394,7 +394,8 @@ class CramMD5Credentials:
         #   -- RFC 2195
         r = random.randrange(0x7fffffff)
         t = time.time()
-        self.challenge = '<%d.%d@%s>' % (r, t, self.host)
+        challenge = '<%d.%d@%s>' % (r, t, self.host)
+        self.challenge = challenge.encode('ascii')
         return self.challenge
 
     def setResponse(self, response):

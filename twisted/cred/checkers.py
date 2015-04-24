@@ -115,7 +115,7 @@ class FilePasswordDB:
     _credCache = None
     _cacheTimestamp = 0
 
-    def __init__(self, filename, delim=':', usernameField=0, passwordField=1,
+    def __init__(self, filename, delim=b':', usernameField=0, passwordField=1,
                  caseSensitive=True, hash=None, cache=False):
         """
         @type filename: C{str}
@@ -193,7 +193,7 @@ class FilePasswordDB:
 
     def _loadCredentials(self):
         try:
-            f = open(self.filename, 'r')
+            f = open(self.filename, 'rb')
         except:
             log.err()
             raise error.UnauthorizedLogin()

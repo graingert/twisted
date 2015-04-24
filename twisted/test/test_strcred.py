@@ -265,10 +265,10 @@ class TestFileDBChecker(unittest.TestCase):
     """
 
     def setUp(self):
-        self.admin = credentials.UsernamePassword('admin', 'asdf')
-        self.alice = credentials.UsernamePassword('alice', 'foo')
-        self.badPass = credentials.UsernamePassword('alice', 'foobar')
-        self.badUser = credentials.UsernamePassword('x', 'yz')
+        self.admin = credentials.UsernamePassword(b'admin', b'asdf')
+        self.alice = credentials.UsernamePassword(b'alice', b'foo')
+        self.badPass = credentials.UsernamePassword(b'alice', b'foobar')
+        self.badUser = credentials.UsernamePassword(b'x', b'yz')
         self.filename = self.mktemp()
         FilePath(self.filename).setContent(b'admin:asdf\nalice:foo\n')
         self.checker = strcred.makeChecker('file:' + self.filename)
