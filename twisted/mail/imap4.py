@@ -37,7 +37,14 @@ from twisted.internet import defer
 from twisted.internet import error
 from twisted.internet.defer import maybeDeferred
 from twisted.python import log, text
-from twisted.python.compat import NativeStringIO as StringIO, iteritems, long
+from twisted.python.compat import (
+    NativeStringIO as StringIO,
+    iteritems,
+    long,
+    networkString,
+    nativeString,
+    ascii,
+)
 from twisted.internet import interfaces
 
 from twisted.cred import credentials
@@ -342,9 +349,9 @@ class WriteBuffer:
 
 
 class Command:
-    _1_RESPONSES = ('CAPABILITY', 'FLAGS', 'LIST', 'LSUB', 'STATUS', 'SEARCH', 'NAMESPACE')
-    _2_RESPONSES = ('EXISTS', 'EXPUNGE', 'FETCH', 'RECENT')
-    _OK_RESPONSES = ('UIDVALIDITY', 'UNSEEN', 'READ-WRITE', 'READ-ONLY', 'UIDNEXT', 'PERMANENTFLAGS')
+    _1_RESPONSES = (b'CAPABILITY', b'FLAGS', b'LIST', b'LSUB', b'STATUS', b'SEARCH', b'NAMESPACE')
+    _2_RESPONSES = (b'EXISTS', b'EXPUNGE', b'FETCH', b'RECENT')
+    _OK_RESPONSES = (b'UIDVALIDITY', b'UNSEEN', b'READ-WRITE', b'READ-ONLY', b'UIDNEXT', b'PERMANENTFLAGS')
     defer = None
 
     def __init__(self, command, args=None, wantResponse=(),
@@ -357,8 +364,8 @@ class Command:
 
     def format(self, tag):
         if self.args is None:
-            return ' '.join((tag, self.command))
-        return ' '.join((tag, self.command, self.args))
+            return b' '.join((tag, self.command))
+        return b' '.join((tag, self.command, self.args))
 
     def finish(self, lastLine, unusedCallback):
         send = []
@@ -597,7 +604,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         try:
             f(line)
         except Exception as e:
-            self.sendUntaggedResponse('BAD Server error: ' + str(e))
+            self.sendUntaggedResponse(b'BAD Server error: ' + ascii(e))
             log.err()
 
     def parse_command(self, line):
@@ -609,21 +616,21 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
             tag, cmd = args
         elif len(args) == 1:
             tag = args[0]
-            self.sendBadResponse(tag, 'Missing command')
+            self.sendBadResponse(tag, b'Missing command')
             return None
         else:
-            self.sendBadResponse(None, 'Null command')
+            self.sendBadResponse(None, b'Null command')
             return None
 
         cmd = cmd.upper()
         try:
             return self.dispatchCommand(tag, cmd, rest)
         except IllegalClientResponse as e:
-            self.sendBadResponse(tag, 'Illegal syntax: ' + str(e))
+            self.sendBadResponse(tag, b'Illegal syntax: ' + ascii(e))
         except IllegalOperation as e:
-            self.sendNegativeResponse(tag, 'Illegal operation: ' + str(e))
+            self.sendNegativeResponse(tag, b'Illegal operation: ' + ascii(e))
         except IllegalMailboxEncoding as e:
-            self.sendNegativeResponse(tag, 'Illegal mailbox name: ' + str(e))
+            self.sendNegativeResponse(tag, 'bIllegal mailbox name: ' + ascii(e))
 
     def parse_pending(self, line):
         d = self._pendingLiteral
@@ -641,7 +648,8 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
             self.sendBadResponse(tag, 'Unsupported command')
 
     def lookupCommand(self, cmd):
-        return getattr(self, '_'.join((self.state, cmd.upper())), None)
+        cmd = nativeString(cmd.upper())
+        return getattr(self, '_'.join((self.state, cmd)), None)
 
     def __doCommand(self, tag, handler, args, parseargs, line, uid):
         for (i, arg) in enumerate(parseargs):
@@ -939,8 +947,8 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         return caps
 
     def do_CAPABILITY(self, tag):
-        self.sendUntaggedResponse('CAPABILITY ' + ' '.join(self.listCapabilities()))
-        self.sendPositiveResponse(tag, 'CAPABILITY completed')
+        self.sendUntaggedResponse(b'CAPABILITY ' + b' '.join(self.listCapabilities()))
+        self.sendPositiveResponse(tag, b'CAPABILITY completed')
 
     unauth_CAPABILITY = (do_CAPABILITY,)
     auth_CAPABILITY = unauth_CAPABILITY
@@ -948,8 +956,8 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
     logout_CAPABILITY = unauth_CAPABILITY
 
     def do_LOGOUT(self, tag):
-        self.sendUntaggedResponse('BYE Nice talking to you')
-        self.sendPositiveResponse(tag, 'LOGOUT successful')
+        self.sendUntaggedResponse(b'BYE Nice talking to you')
+        self.sendPositiveResponse(tag, b'LOGOUT successful')
         self.transport.loseConnection()
 
     unauth_LOGOUT = (do_LOGOUT,)
@@ -958,7 +966,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
     logout_LOGOUT = unauth_LOGOUT
 
     def do_NOOP(self, tag):
-        self.sendPositiveResponse(tag, 'NOOP No operation performed')
+        self.sendPositiveResponse(tag, b'NOOP No operation performed')
 
     unauth_NOOP = (do_NOOP,)
     auth_NOOP = unauth_NOOP
@@ -968,7 +976,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
     def do_AUTHENTICATE(self, tag, args):
         args = args.upper().strip()
         if args not in self.challengers:
-            self.sendNegativeResponse(tag, 'AUTHENTICATE method unsupported')
+            self.sendNegativeResponse(tag, b'AUTHENTICATE method unsupported')
         else:
             self.authenticate(self.challengers[args](), tag)
 
@@ -976,7 +984,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
 
     def authenticate(self, chal, tag):
         if self.portal is None:
-            self.sendNegativeResponse(tag, 'Temporary authentication failure')
+            self.sendNegativeResponse(tag, b'Temporary authentication failure')
             return
 
         self._setupChallenge(chal, tag)
@@ -985,7 +993,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         try:
             challenge = chal.getChallenge()
         except Exception as e:
-            self.sendBadResponse(tag, 'Server error: ' + str(e))
+            self.sendBadResponse(tag, b'Server error: ' + str(e))
         else:
             coded = base64.encodestring(challenge)[:-1]
             self.parseState = 'pending'
@@ -1177,7 +1185,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
     def parse_idle(self, *args):
         self.parseState = self.lastState
         del self.lastState
-        self.sendPositiveResponse(self.parseTag, "IDLE terminated")
+        self.sendPositiveResponse(self.parseTag, b"IDLE terminated")
         del self.parseTag
 
     select_IDLE = ( do_IDLE, )
@@ -2246,10 +2254,10 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
     # objects.
     authenticators = None
 
-    STATUS_CODES = ('OK', 'NO', 'BAD', 'PREAUTH', 'BYE')
+    STATUS_CODES = (b'OK', b'NO', b'BAD', b'PREAUTH', b'BYE')
 
     STATUS_TRANSFORMATIONS = {
-        'MESSAGES': int, 'RECENT': int, 'UNSEEN': int
+        b'MESSAGES': int, b'RECENT': int, b'UNSEEN': int
     }
 
     context = None
@@ -2345,10 +2353,10 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
         if self.timeout > 0:
             self.resetTimeout()
 
-        lastPart = line.rfind('{')
+        lastPart = line.rfind(b'{')
         if lastPart != -1:
             lastPart = line[lastPart + 1:]
-            if lastPart.endswith('}'):
+            if lastPart.endswith(b'}'):
                 # It's a literal a-comin' in
                 try:
                     octets = int(lastPart[:-1])
@@ -2369,7 +2377,7 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
             # Since we didn't find a literal indicator, this expression
             # is done.
             self._parts.append(line)
-            tag, rest = self._tag, ''.join(self._parts)
+            tag, rest = self._tag, b''.join(self._parts)
             self._tag = self._parts = None
             self.dispatchCommand(tag, rest)
 
@@ -2411,7 +2419,7 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
     def makeTag(self):
         tag = '%0.4X' % self.tagID
         self.tagID += 1
-        return tag
+        return networkString(tag)
 
     def dispatchCommand(self, tag, rest):
         if self.state is None:
@@ -2432,16 +2440,16 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
         if self.state is None:
             # Server greeting, this is
             status, rest = rest.split(None, 1)
-            if status.upper() == 'OK':
+            if status.upper() == b'OK':
                 self.state = 'unauth'
-            elif status.upper() == 'PREAUTH':
+            elif status.upper() == b'PREAUTH':
                 self.state = 'auth'
             else:
                 # XXX - This is rude.
                 self.transport.loseConnection()
-                raise IllegalServerResponse(tag + ' ' + rest)
+                raise IllegalServerResponse(tag + b' ' + rest)
 
-            b, e = rest.find('['), rest.find(']')
+            b, e = rest.find(b'['), rest.find(b']')
             if b != -1 and e != -1:
                 self.serverGreeting(
                     self.__cbCapabilities(
@@ -2455,12 +2463,12 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
         self._defaultHandler(tag, rest)
 
     def _defaultHandler(self, tag, rest):
-        if tag == '*' or tag == '+':
+        if tag == b'*' or tag == b'+':
             if not self.waiting:
                 self._extraInfo([parseNestedParens(rest)])
             else:
                 cmd = self.tags[self.waiting]
-                if tag == '+':
+                if tag == b'+':
                     cmd.continuation(rest)
                 else:
                     cmd.lines.append(rest)
@@ -2470,10 +2478,10 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
             except KeyError:
                 # XXX - This is rude.
                 self.transport.loseConnection()
-                raise IllegalServerResponse(tag + ' ' + rest)
+                raise IllegalServerResponse(nativeString(tag) + ' ' + nativeString(rest))
             else:
                 status, line = rest.split(None, 1)
-                if status == 'OK':
+                if status == b'OK':
                     # Give them this last line, too
                     cmd.finish(rest, self._extraInfo)
                 else:
@@ -2525,7 +2533,6 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
             return cmd.defer
         t = self.makeTag()
         self.tags[t] = cmd
-        import pdb; pdb.set_trace()
         self.sendLine(cmd.format(t))
         self.waiting = t
         self._lastCmd = cmd
@@ -2549,8 +2556,8 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
         """
         if useCache and self._capCache is not None:
             return defer.succeed(self._capCache)
-        cmd = 'CAPABILITY'
-        resp = ('CAPABILITY',)
+        cmd = b'CAPABILITY'
+        resp = (b'CAPABILITY',)
         d = self.sendCommand(Command(cmd, wantResponse=resp))
         d.addCallback(self.__cbCapabilities)
         return d
@@ -3273,10 +3280,10 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
         will be invoked if there is an error.
         """
         if kwarg.get('uid'):
-            cmd = 'UID SEARCH'
+            cmd = b'UID SEARCH'
         else:
-            cmd = 'SEARCH'
-        args = ' '.join(queries)
+            cmd = b'SEARCH'
+        args = b' '.join(queries)
         d = self.sendCommand(Command(cmd, args, wantResponse=(cmd,)))
         d.addCallback(self.__cbSearch)
         return d
@@ -4294,9 +4301,9 @@ def collapseStrings(results):
     """
     copy = []
     begun = None
-    listsList = [isinstance(s, types.ListType) for s in results]
+    listsList = [isinstance(s, list) for s in results]
 
-    pred = lambda e: isinstance(e, types.TupleType)
+    pred = lambda e: isinstance(e, tuple)
     tran = {
         0: lambda e: splitQuoted(''.join(e)),
         1: lambda e: [''.join([i[0] for i in e])]

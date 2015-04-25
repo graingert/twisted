@@ -4667,7 +4667,7 @@ class CopyWorkerTests(unittest.TestCase):
         d = f([im for im in zip(range(1, 11), msgs)], 'tag', m)
 
         def cbCopy(results):
-            self.assertEqual(results, zip([1] * 10, range(1, 11)))
+            self.assertEqual(results, list(zip([1] * 10, range(1, 11))))
             for (orig, new) in zip(msgs, m.msgs):
                 self.assertIdentical(orig, new)
 
