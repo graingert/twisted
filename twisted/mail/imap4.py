@@ -37,7 +37,7 @@ from twisted.internet import defer
 from twisted.internet import error
 from twisted.internet.defer import maybeDeferred
 from twisted.python import log, text
-from twisted.python.compat import NativeStringIO as StringIO, iteritems
+from twisted.python.compat import NativeStringIO as StringIO, iteritems, long
 from twisted.internet import interfaces
 
 from twisted.cred import credentials
@@ -479,7 +479,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
     """
 
     # Identifier for this server software
-    IDENT = 'Twisted IMAP4rev1 Ready'
+    IDENT = b'Twisted IMAP4rev1 Ready'
 
     # Number of seconds before idle timeout
     # Initially 1 minute.  Raised to 30 minutes after login.
@@ -536,13 +536,13 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         self._queuedAsync = []
 
     def capabilities(self):
-        cap = {'AUTH': self.challengers.keys()}
+        cap = {b'AUTH': list(self.challengers.keys())}
         if self.ctx and self.canStartTLS:
             if not self.startedTLS and interfaces.ISSLTransport(self.transport, None) is None:
-                cap['LOGINDISABLED'] = None
-                cap['STARTTLS'] = None
-        cap['NAMESPACE'] = None
-        cap['IDLE'] = None
+                cap[b'LOGINDISABLED'] = None
+                cap[b'STARTTLS'] = None
+        cap[b'NAMESPACE'] = None
+        cap[b'IDLE'] = None
         return cap
 
     def connectionMade(self):
@@ -886,17 +886,23 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
             return (None, line)
 
     def sendServerGreeting(self):
-        msg = '[CAPABILITY %s] %s' % (' '.join(self.listCapabilities()), self.IDENT)
+        capabilities = b' '.join(self.listCapabilities())
+        msg = b''.join([
+            b'[CAPABILITY ',
+            capabilities,
+            b' ',
+            self.IDENT,
+        ])
         self.sendPositiveResponse(message=msg)
 
-    def sendBadResponse(self, tag = None, message = ''):
-        self._respond('BAD', tag, message)
+    def sendBadResponse(self, tag = None, message = b''):
+        self._respond(b'BAD', tag, message)
 
-    def sendPositiveResponse(self, tag = None, message = ''):
-        self._respond('OK', tag, message)
+    def sendPositiveResponse(self, tag = None, message = b''):
+        self._respond(b'OK', tag, message)
 
-    def sendNegativeResponse(self, tag = None, message = ''):
-        self._respond('NO', tag, message)
+    def sendNegativeResponse(self, tag = None, message = b''):
+        self._respond(b'NO', tag, message)
 
     def sendUntaggedResponse(self, message, async=False):
         if not async or (self.blocked is None):
@@ -911,25 +917,25 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
             self.sendLine('+')
 
     def _respond(self, state, tag, message):
-        if state in ('OK', 'NO', 'BAD') and self._queuedAsync:
+        if state in (b'OK', b'NO', b'BAD') and self._queuedAsync:
             lines = self._queuedAsync
             self._queuedAsync = []
             for msg in lines:
                 self._respond(msg, None, None)
         if not tag:
-            tag = '*'
+            tag = b'*'
         if message:
-            self.sendLine(' '.join((tag, state, message)))
+            self.sendLine(b' '.join((tag, state, message)))
         else:
-            self.sendLine(' '.join((tag, state)))
+            self.sendLine(b' '.join((tag, state)))
 
     def listCapabilities(self):
-        caps = ['IMAP4rev1']
+        caps = [b'IMAP4rev1']
         for c, v in iteritems(self.capabilities()):
             if v is None:
                 caps.append(c)
             elif len(v):
-                caps.extend([('%s=%s' % (c, cap)) for cap in v])
+                caps.extend([b'='.join([c, cap]) for cap in v])
         return caps
 
     def do_CAPABILITY(self, tag):
@@ -1033,10 +1039,10 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
             self.transport.startTLS(self.ctx)
             self.startedTLS = True
             self.challengers = self.challengers.copy()
-            if 'LOGIN' not in self.challengers:
-                self.challengers['LOGIN'] = LOGINCredentials
-            if 'PLAIN' not in self.challengers:
-                self.challengers['PLAIN'] = PLAINCredentials
+            if b'LOGIN' not in self.challengers:
+                self.challengers[b'LOGIN'] = LOGINCredentials
+            if b'PLAIN' not in self.challengers:
+                self.challengers[b'PLAIN'] = PLAINCredentials
         else:
             self.sendNegativeResponse(tag, 'TLS not available')
 
@@ -2178,7 +2184,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         else:
             self.sendUntaggedResponse(message='[READ-ONLY]', async=True)
 
-    def flagsChanged(sel:
+    def flagsChanged(self, newFlags):
         for (mId, flags) in iteritems(newFlags):
             msg = '%d FETCH (FLAGS (%s))' % (mId, ' '.join(flags))
             self.sendUntaggedResponse(msg, async=True)
@@ -2319,7 +2325,8 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
         if self.tags is not None:
             tags = self.tags
             self.tags = None
-            for cmd in tags.itervalues():
+            for key, cmd in iteritems(tags):
+                del key
                 if cmd is not None and cmd.defer is not None:
                     cmd.defer.errback(reason)
 
@@ -2518,6 +2525,7 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
             return cmd.defer
         t = self.makeTag()
         self.tags[t] = cmd
+        import pdb; pdb.set_trace()
         self.sendLine(cmd.format(t))
         self.waiting = t
         self._lastCmd = cmd

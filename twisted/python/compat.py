@@ -279,6 +279,11 @@ if _PY3:
 else:
     unicode = unicode
 
+if _PY3:
+    long = int
+else:
+    long = long
+
 
 
 def ioType(fileIshObject, default=unicode):
