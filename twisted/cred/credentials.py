@@ -16,6 +16,7 @@ from hashlib import md5
 from twisted.python.randbytes import secureRandom
 from twisted.cred._digest import calcResponse, calcHA1, calcHA2
 from twisted.cred import error
+from twisted.python.compat import networkString
 
 class ICredentials(Interface):
     """
@@ -378,7 +379,7 @@ class DigestCredentialFactory(object):
 class CramMD5Credentials:
 
     challenge = b''
-    response = ''
+    response = b''
 
     def __init__(self, host=None):
         self.host = host
@@ -405,7 +406,7 @@ class CramMD5Credentials:
         return False
 
     def checkPassword(self, password):
-        verify = hmac.HMAC(password, self.challenge).hexdigest()
+        verify = networkString(hmac.HMAC(password, self.challenge).hexdigest())
         return verify == self.response
 
 

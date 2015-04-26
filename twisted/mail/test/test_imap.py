@@ -11,6 +11,7 @@ import codecs
 import collections
 import locale
 import os
+from os import path as os_path
 import types
 
 from zope.interface import implementer
@@ -1130,7 +1131,8 @@ class IMAP4HelperMixin:
     def _ebGeneral(self, failure):
         self.client.transport.loseConnection()
         self.server.transport.loseConnection()
-        log.err(failure, "Problem with %r" % (self.function,))
+        function = getattr(self, 'function', 'Unknown Function')
+        log.err(failure, "Problem with %r" % (function,))
 
 
     def loopback(self):
@@ -1153,7 +1155,7 @@ class IMAP4ServerTests(IMAP4HelperMixin, unittest.TestCase):
 
     def testCapabilityWithAuth(self):
         caps = {}
-        self.server.challengers['CRAM-MD5'] = CramMD5Credentials
+        self.server.challengers[b'CRAM-MD5'] = CramMD5Credentials
         def getCaps():
             def gotCaps(c):
                 caps.update(c)
@@ -1162,8 +1164,8 @@ class IMAP4ServerTests(IMAP4HelperMixin, unittest.TestCase):
         d1 = self.connected.addCallback(strip(getCaps)).addErrback(self._ebGeneral)
         d = defer.gatherResults([self.loopback(), d1])
 
-        expCap = {'IMAP4rev1': None, 'NAMESPACE': None,
-                  'IDLE': None, 'AUTH': ['CRAM-MD5']}
+        expCap = {b'IMAP4rev1': None, b'NAMESPACE': None,
+                  b'IDLE': None, b'AUTH': [b'CRAM-MD5']}
 
         return d.addCallback(lambda _: self.assertEqual(expCap, caps))
 
@@ -1612,7 +1614,10 @@ class IMAP4ServerTests(IMAP4HelperMixin, unittest.TestCase):
         )
 
     def testFullAppend(self):
-        infile = util.sibpath(__file__, 'rfc822.message')
+        infile = os_path.join(
+            os_path.dirname(os_path.abspath(__file__)),
+            'rfc822.message'
+        )
         message = open(infile)
         SimpleServer.theAccount.addMailbox('root/subthing')
         def login():
@@ -1877,7 +1882,7 @@ class TestChecker:
     credentialInterfaces = (IUsernameHashedPassword, IUsernamePassword)
 
     users = {
-        'testuser': 'secret'
+        b'testuser': b'secret'
     }
 
     def requestAvatarId(self, credentials):
@@ -1905,12 +1910,12 @@ class AuthenticatorTests(IMAP4HelperMixin, unittest.TestCase):
         self.account = realm.theAccount
 
     def testCramMD5(self):
-        self.server.challengers['CRAM-MD5'] = CramMD5Credentials
-        cAuth = imap4.CramMD5ClientAuthenticator('testuser')
+        self.server.challengers[b'CRAM-MD5'] = CramMD5Credentials
+        cAuth = imap4.CramMD5ClientAuthenticator(b'testuser')
         self.client.registerAuthenticator(cAuth)
 
         def auth():
-            return self.client.authenticate('secret')
+            return self.client.authenticate(b'secret')
         def authed():
             self.authenticated = 1
 
@@ -1926,12 +1931,12 @@ class AuthenticatorTests(IMAP4HelperMixin, unittest.TestCase):
         self.assertEqual(self.server.account, self.account)
 
     def testFailedCramMD5(self):
-        self.server.challengers['CRAM-MD5'] = CramMD5Credentials
-        cAuth = imap4.CramMD5ClientAuthenticator('testuser')
+        self.server.challengers[b'CRAM-MD5'] = CramMD5Credentials
+        cAuth = imap4.CramMD5ClientAuthenticator(b'testuser')
         self.client.registerAuthenticator(cAuth)
 
         def misauth():
-            return self.client.authenticate('not the secret')
+            return self.client.authenticate(b'not the secret')
         def authed():
             self.authenticated = 1
         def misauthed():
@@ -1948,12 +1953,12 @@ class AuthenticatorTests(IMAP4HelperMixin, unittest.TestCase):
         self.assertEqual(self.server.account, None)
 
     def testLOGIN(self):
-        self.server.challengers['LOGIN'] = imap4.LOGINCredentials
-        cAuth = imap4.LOGINAuthenticator('testuser')
+        self.server.challengers[b'LOGIN'] = imap4.LOGINCredentials
+        cAuth = imap4.LOGINAuthenticator(b'testuser')
         self.client.registerAuthenticator(cAuth)
 
         def auth():
-            return self.client.authenticate('secret')
+            return self.client.authenticate(b'secret')
         def authed():
             self.authenticated = 1
 
@@ -1968,12 +1973,13 @@ class AuthenticatorTests(IMAP4HelperMixin, unittest.TestCase):
         self.assertEqual(self.server.account, self.account)
 
     def testFailedLOGIN(self):
-        self.server.challengers['LOGIN'] = imap4.LOGINCredentials
-        cAuth = imap4.LOGINAuthenticator('testuser')
+        import pdb; pdb.triggered = True
+        self.server.challengers[b'LOGIN'] = imap4.LOGINCredentials
+        cAuth = imap4.LOGINAuthenticator(b'testuser')
         self.client.registerAuthenticator(cAuth)
 
         def misauth():
-            return self.client.authenticate('not the secret')
+            return self.client.authenticate(b'not the secret')
         def authed():
             self.authenticated = 1
         def misauthed():
@@ -1990,12 +1996,12 @@ class AuthenticatorTests(IMAP4HelperMixin, unittest.TestCase):
         self.assertEqual(self.server.account, None)
 
     def testPLAIN(self):
-        self.server.challengers['PLAIN'] = imap4.PLAINCredentials
-        cAuth = imap4.PLAINAuthenticator('testuser')
+        self.server.challengers[b'PLAIN'] = imap4.PLAINCredentials
+        cAuth = imap4.PLAINAuthenticator(b'testuser')
         self.client.registerAuthenticator(cAuth)
 
         def auth():
-            return self.client.authenticate('secret')
+            return self.client.authenticate(b'secret')
         def authed():
             self.authenticated = 1
 
@@ -2010,12 +2016,13 @@ class AuthenticatorTests(IMAP4HelperMixin, unittest.TestCase):
         self.assertEqual(self.server.account, self.account)
 
     def testFailedPLAIN(self):
-        self.server.challengers['PLAIN'] = imap4.PLAINCredentials
-        cAuth = imap4.PLAINAuthenticator('testuser')
+        import pdb; pdb.t = True
+        self.server.challengers[b'PLAIN'] = imap4.PLAINCredentials
+        cAuth = imap4.PLAINAuthenticator(b'testuser')
         self.client.registerAuthenticator(cAuth)
 
         def misauth():
-            return self.client.authenticate('not the secret')
+            return self.client.authenticate(b'not the secret')
         def authed():
             self.authenticated = 1
         def misauthed():
@@ -2048,12 +2055,12 @@ class SASLPLAINTests(unittest.TestCase):
 
             NUL<authn-id>NUL<secret>
         """
-        username = 'testuser'
-        secret = 'secret'
-        chal = 'challenge'
+        username = b'testuser'
+        secret = b'secret'
+        chal = b'challenge'
         cAuth = imap4.PLAINAuthenticator(username)
         response = cAuth.challengeResponse(secret, chal)
-        self.assertEqual(response, '\0%s\0%s' % (username, secret))
+        self.assertEqual(response, b'\0testuser\0secret')
 
 
     def test_credentialsSetResponse(self):
@@ -2064,9 +2071,9 @@ class SASLPLAINTests(unittest.TestCase):
             NUL<authn-id>NUL<secret>
         """
         cred = imap4.PLAINCredentials()
-        cred.setResponse('\0testuser\0secret')
-        self.assertEqual(cred.username, 'testuser')
-        self.assertEqual(cred.password, 'secret')
+        cred.setResponse(b'\0testuser\0secret')
+        self.assertEqual(cred.username, b'testuser')
+        self.assertEqual(cred.password, b'secret')
 
 
     def test_credentialsInvalidResponse(self):
@@ -2551,17 +2558,17 @@ class HandCraftedTests(IMAP4HelperMixin, unittest.TestCase):
 
         protocol.makeConnection(transport)
         protocol.lineReceived(
-            '* OK [CAPABILITY IMAP4rev1 IDLE NAMESPACE AUTH=CRAM-MD5] '
-            'Twisted IMAP4rev1 Ready')
-        cAuth = imap4.CramMD5ClientAuthenticator('testuser')
+            b'* OK [CAPABILITY IMAP4rev1 IDLE NAMESPACE AUTH=CRAM-MD5] '
+            b'Twisted IMAP4rev1 Ready')
+        cAuth = imap4.CramMD5ClientAuthenticator(b'testuser')
         protocol.registerAuthenticator(cAuth)
 
-        d = protocol.authenticate('secret')
+        d = protocol.authenticate(b'secret')
         # Should really be something describing the base64 decode error.  See
         # #6021.
         self.assertFailure(d, error.ConnectionDone)
 
-        protocol.dataReceived('+ Something bad! and bad\r\n')
+        protocol.dataReceived(b'+ Something bad! and bad\r\n')
 
         # This should not really be logged.  See #6021.
         logged = self.flushLoggedErrors(imap4.IllegalServerResponse)
@@ -4295,7 +4302,6 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         """
         If the search filter starts with a star, the result should be identical
         with if the filter would end with a star.
-    import pdb; pdb.set_trace()
         """
         return self._messageSetSearchTest('*:2', [2, 3, 4, 5])
 
