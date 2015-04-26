@@ -44,6 +44,7 @@ from twisted.python.compat import (
     networkString,
     nativeString,
     ascii,
+    unicode,
 )
 from twisted.internet import interfaces
 
@@ -90,7 +91,7 @@ class MessageSet(object):
         if start is self._empty:
             return
 
-        if isinstance(start, types.ListType):
+        if isinstance(start, list):
             self.ranges = start[:]
             self.clean()
         else:
@@ -198,8 +199,7 @@ class MessageSet(object):
                 self.ranges[i] = (l, h)
 
             oldl, oldh = l, h
-
-        self.ranges = filter(None, self.ranges)
+        self.ranges = [item for item in self.ranges if item]
 
 
     def __contains__(self, value):
@@ -375,7 +375,7 @@ class Command:
             N = len(names)
             if (N >= 1 and names[0] in self._1_RESPONSES or
                 N >= 2 and names[1] in self._2_RESPONSES or
-                N >= 2 and names[0] == 'OK' and isinstance(names[1], types.ListType) and names[1][0] in self._OK_RESPONSES):
+                N >= 2 and names[0] == 'OK' and isinstance(names[1], list) and names[1][0] in self._OK_RESPONSES):
                 send.append(names)
             else:
                 unuse.append(names)
@@ -565,7 +565,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
             self._onLogout = None
 
     def timeoutConnection(self):
-        self.sendLine('* BYE Autologout; connection idle too long')
+        self.sendLine(b'* BYE Autologout; connection idle too long')
         self.transport.loseConnection()
         if self.mbox:
             self.mbox.removeListener(self)
@@ -1883,7 +1883,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         if self.blocked is None:
             self.blocked = []
         try:
-            id, msg = results.next()
+            id, msg = next(results)
         except StopIteration:
             # The idle timeout was suspended while we delivered results,
             # restore it now.
@@ -3627,12 +3627,12 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
         responseParts = iter(fetchResponseList)
         while True:
             try:
-                key = responseParts.next()
+                key = next(responseParts)
             except StopIteration:
                 break
 
             try:
-                value = responseParts.next()
+                value = next(responseParts)
             except StopIteration:
                 raise IllegalServerResponse(
                     "Not enough arguments", fetchResponseList)
@@ -3687,7 +3687,7 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
                 else:
                     key = (key, (value[0], tuple(value[1])))
                 try:
-                    value = responseParts.next()
+                    value = next(responseParts)
                 except StopIteration:
                     raise IllegalServerResponse(
                         "Not enough arguments", fetchResponseList)
@@ -3702,7 +3702,7 @@ class IMAP4Client(basic.LineReceiver, policies.TimeoutMixin):
                     else:
                         key = key + (value,)
                         try:
-                            value = responseParts.next()
+                            value = next(responseParts)
                         except StopIteration:
                             raise IllegalServerResponse(
                                 "Not enough arguments", fetchResponseList)
@@ -4162,7 +4162,7 @@ def Query(sorted=0, **kwarg):
     @return: The formatted query string
     """
     cmd = []
-    keys = kwarg.keys()
+    keys = list(kwarg.keys())
     if sorted:
         keys.sort()
     for k in keys:
@@ -4233,23 +4233,25 @@ def splitQuoted(s):
     result = []
     word = []
     inQuote = inWord = False
-    for i, c in enumerate(s):
-        if c == '"':
-            if i and s[i-1] == '\\':
+    # stride with slices to iterate over byte objects in Python 3
+    for i in range(len(s)):
+        c = s[i:i+1]
+        if c == b'"':
+            if i and s[i-1] == b'\\':
                 word.pop()
-                word.append('"')
+                word.append(b'"')
             elif not inQuote:
                 inQuote = True
             else:
                 inQuote = False
-                result.append(''.join(word))
+                result.append(b''.join(word))
                 word = []
-        elif not inWord and not inQuote and c not in ('"' + string.whitespace):
+        elif not inWord and not inQuote and c not in (b'"' + networkString(string.whitespace)):
             inWord = True
             word.append(c)
-        elif inWord and not inQuote and c in string.whitespace:
-            w = ''.join(word)
-            if w == 'NIL':
+        elif inWord and not inQuote and c in networkString(string.whitespace):
+            w = b''.join(word)
+            if w == b'NIL':
                 result.append(None)
             else:
                 result.append(w)
@@ -4261,8 +4263,8 @@ def splitQuoted(s):
     if inQuote:
         raise MismatchedQuoting(s)
     if inWord:
-        w = ''.join(word)
-        if w == 'NIL':
+        w = b''.join(word)
+        if w == b'NIL':
             result.append(None)
         else:
             result.append(w)
@@ -4286,6 +4288,20 @@ def splitOn(sequence, predicate, transformers):
     result.extend(transformers[mode](tmp))
     return result
 
+
+def cs_pred(e):
+    return isinstance(e, tuple)
+
+
+def cs_tran_0(e):
+    return splitQuoted(b''.join(e))
+
+
+def cs_tran_1(i, e):
+    return [b''.join([i[0] for i in e])]
+
+
+
 def collapseStrings(results):
     """
     Turns a list of length-one strings and lists into a list of longer
@@ -4303,21 +4319,20 @@ def collapseStrings(results):
     begun = None
     listsList = [isinstance(s, list) for s in results]
 
-    pred = lambda e: isinstance(e, tuple)
     tran = {
-        0: lambda e: splitQuoted(''.join(e)),
-        1: lambda e: [''.join([i[0] for i in e])]
+        0: cs_tran_0,
+        1: cs_tran_1,
     }
     for (i, c, isList) in zip(range(len(results)), results, listsList):
         if isList:
             if begun is not None:
-                copy.extend(splitOn(results[begun:i], pred, tran))
+                copy.extend(splitOn(results[begun:i], cs_pred, tran))
                 begun = None
             copy.append(collapseStrings(c))
         elif begun is None:
             begun = i
     if begun is not None:
-        copy.extend(splitOn(results[begun:], pred, tran))
+        copy.extend(splitOn(results[begun:], cs_pred, tran))
     return copy
 
 
@@ -4342,30 +4357,30 @@ def parseNestedParens(s, handleLiteral = 1):
         while i < L:
             c = s[i]
             if inQuote:
-                if c == '\\':
+                if c == b'\\':
                     contentStack[-1].append(s[i:i+2])
                     i += 2
                     continue
-                elif c == '"':
+                elif c == b'"':
                     inQuote = not inQuote
                 contentStack[-1].append(c)
                 i += 1
             else:
-                if c == '"':
+                if c == b'"':
                     contentStack[-1].append(c)
                     inQuote = not inQuote
                     i += 1
-                elif handleLiteral and c == '{':
-                    end = s.find('}', i)
+                elif handleLiteral and c == b'{':
+                    end = s.find(b'}', i)
                     if end == -1:
                         raise ValueError("Malformed literal")
                     literalSize = int(s[i+1:end])
                     contentStack[-1].append((s[end+3:end+3+literalSize],))
                     i = end + 3 + literalSize
-                elif c == '(' or c == '[':
+                elif c == b'(' or c == b'[':
                     contentStack.append([])
                     i += 1
-                elif c == ')' or c == ']':
+                elif c == b')' or c == b']':
                     contentStack[-2].append(contentStack.pop())
                     i += 1
                 else:
@@ -4438,7 +4453,7 @@ def collapseNestedLists(items):
             pieces.extend([' ', 'NIL'])
         elif isinstance(i, (DontQuoteMe, int, long)):
             pieces.extend([' ', str(i)])
-        elif isinstance(i, types.StringTypes):
+        elif isinstance(i, (bytes, unicode)):
             if _needsLiteral(i):
                 pieces.extend([' ', '{', str(len(i)), '}', IMAP4Server.delimiter, i])
             else:
@@ -4747,7 +4762,7 @@ class MemoryAccount(object):
         return 1
 
     def create(self, pathspec):
-        paths = filter(None, pathspec.split('/'))
+        paths = [path for path in pathspec.split('/') if path]
         for accum in range(1, len(paths)):
             try:
                 self.addMailbox('/'.join(paths[:accum]))
@@ -5691,7 +5706,7 @@ def iterateInReactor(i):
     d = defer.Deferred()
     def go(last):
         try:
-            r = i.next()
+            r = next(i)
         except StopIteration:
             d.callback(last)
         except:

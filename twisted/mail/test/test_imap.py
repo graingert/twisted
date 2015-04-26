@@ -8,6 +8,7 @@ Test case for twisted.mail.imap4
 """
 
 import codecs
+import collections
 import locale
 import os
 import types
@@ -157,7 +158,7 @@ class BufferingConsumer:
 class MessageProducerTests(unittest.TestCase):
     def testSinglePart(self):
         body = 'This is body text.  Rar.'
-        headers = util.OrderedDict()
+        headers = collections.OrderedDict()
         headers['from'] = 'sender@host'
         headers['to'] = 'recipient@domain'
         headers['subject'] = 'booga booga boo'
@@ -187,13 +188,13 @@ class MessageProducerTests(unittest.TestCase):
     def testSingleMultiPart(self):
         outerBody = ''
         innerBody = 'Contained body message text.  Squarge.'
-        headers = util.OrderedDict()
+        headers = collections.OrderedDict()
         headers['from'] = 'sender@host'
         headers['to'] = 'recipient@domain'
         headers['subject'] = 'booga booga boo'
         headers['content-type'] = 'multipart/alternative; boundary="xyz"'
 
-        innerHeaders = util.OrderedDict()
+        innerHeaders = collections.OrderedDict()
         innerHeaders['subject'] = 'this is subject text'
         innerHeaders['content-type'] = 'text/plain'
         msg = FakeyMessage(headers, (), None, outerBody, 123,
@@ -232,15 +233,15 @@ class MessageProducerTests(unittest.TestCase):
         outerBody = ''
         innerBody1 = 'Contained body message text.  Squarge.'
         innerBody2 = 'Secondary <i>message</i> text of squarge body.'
-        headers = util.OrderedDict()
+        headers = collections.OrderedDict()
         headers['from'] = 'sender@host'
         headers['to'] = 'recipient@domain'
         headers['subject'] = 'booga booga boo'
         headers['content-type'] = 'multipart/alternative; boundary="xyz"'
-        innerHeaders = util.OrderedDict()
+        innerHeaders = collections.OrderedDict()
         innerHeaders['subject'] = 'this is subject text'
         innerHeaders['content-type'] = 'text/plain'
-        innerHeaders2 = util.OrderedDict()
+        innerHeaders2 = collections.OrderedDict()
         innerHeaders2['subject'] = '<b>this is subject</b>'
         innerHeaders2['content-type'] = 'text/html'
         msg = FakeyMessage(headers, (), None, outerBody, 123, [
@@ -419,55 +420,55 @@ class IMAP4HelperTests(unittest.TestCase):
 
     def test_quotedSplitter(self):
         cases = [
-            '''Hello World''',
-            '''Hello "World!"''',
-            '''World "Hello" "How are you?"''',
-            '''"Hello world" How "are you?"''',
-            '''foo bar "baz buz" NIL''',
-            '''foo bar "baz buz" "NIL"''',
-            '''foo NIL "baz buz" bar''',
-            '''foo "NIL" "baz buz" bar''',
-            '''"NIL" bar "baz buz" foo''',
-            'oo \\"oo\\" oo',
-            '"oo \\"oo\\" oo"',
-            'oo \t oo',
-            '"oo \t oo"',
-            'oo \\t oo',
-            '"oo \\t oo"',
-            'oo \o oo',
-            '"oo \o oo"',
-            'oo \\o oo',
-            '"oo \\o oo"',
+           b'''Hello World''',
+           b'''Hello "World!"''',
+           b'''World "Hello" "How are you?"''',
+           b'''"Hello world" How "are you?"''',
+           b'''foo bar "baz buz" NIL''',
+           b'''foo bar "baz buz" "NIL"''',
+           b'''foo NIL "baz buz" bar''',
+           b'''foo "NIL" "baz buz" bar''',
+           b'''"NIL" bar "baz buz" foo''',
+           b'oo \\"oo\\" oo',
+           b'"oo \\"oo\\" oo"',
+           b'oo \t oo',
+           b'"oo \t oo"',
+           b'oo \\t oo',
+           b'"oo \\t oo"',
+           b'oo \o oo',
+           b'"oo \o oo"',
+           b'oo \\o oo',
+           b'"oo \\o oo"',
         ]
 
         answers = [
-            ['Hello', 'World'],
-            ['Hello', 'World!'],
-            ['World', 'Hello', 'How are you?'],
-            ['Hello world', 'How', 'are you?'],
-            ['foo', 'bar', 'baz buz', None],
-            ['foo', 'bar', 'baz buz', 'NIL'],
-            ['foo', None, 'baz buz', 'bar'],
-            ['foo', 'NIL', 'baz buz', 'bar'],
-            ['NIL', 'bar', 'baz buz', 'foo'],
-            ['oo', '"oo"', 'oo'],
-            ['oo "oo" oo'],
-            ['oo', 'oo'],
-            ['oo \t oo'],
-            ['oo', '\\t', 'oo'],
-            ['oo \\t oo'],
-            ['oo', '\o', 'oo'],
-            ['oo \o oo'],
-            ['oo', '\\o', 'oo'],
-            ['oo \\o oo'],
+            [b'Hello', b'World'],
+            [b'Hello', b'World!'],
+            [b'World', b'Hello', b'How are you?'],
+            [b'Hello world', b'How', b'are you?'],
+            [b'foo', b'bar', b'baz buz', None],
+            [b'foo', b'bar', b'baz buz', b'NIL'],
+            [b'foo', None, b'baz buz', b'bar'],
+            [b'foo', b'NIL', b'baz buz', b'bar'],
+            [b'NIL', b'bar', b'baz buz', b'foo'],
+            [b'oo', b'"oo"', b'oo'],
+            [b'oo "oo" oo'],
+            [b'oo', b'oo'],
+            [b'oo \t oo'],
+            [b'oo', b'\\t', b'oo'],
+            [b'oo \\t oo'],
+            [b'oo', b'\o', b'oo'],
+            [b'oo \o oo'],
+            [b'oo', b'\\o', b'oo'],
+            [b'oo \\o oo'],
 
         ]
 
         errors = [
-            '"mismatched quote',
-            'mismatched quote"',
-            'mismatched"quote',
-            '"oops here is" another"',
+            b'"mismatched quote',
+            b'mismatched quote"',
+            b'mismatched"quote',
+            b'"oops here is" another"',
         ]
 
         for s in errors:
@@ -479,23 +480,23 @@ class IMAP4HelperTests(unittest.TestCase):
 
     def test_stringCollapser(self):
         cases = [
-            ['a', 'b', 'c', 'd', 'e'],
-            ['a', ' ', '"', 'b', 'c', ' ', '"', ' ', 'd', 'e'],
-            [['a', 'b', 'c'], 'd', 'e'],
-            ['a', ['b', 'c', 'd'], 'e'],
-            ['a', 'b', ['c', 'd', 'e']],
-            ['"', 'a', ' ', '"', ['b', 'c', 'd'], '"', ' ', 'e', '"'],
-            ['a', ['"', ' ', 'b', 'c', ' ', ' ', '"'], 'd', 'e'],
+            [b'a', b'b', b'c', b'd', b'e'],
+            [b'a', b' ', b'"', b'b', b'c', b' ', b'"', b' ', b'd', b'e'],
+            [[b'a', b'b', b'c'], b'd', b'e'],
+            [b'a', [b'b', b'c', b'd'], b'e'],
+            [b'a', b'b', [b'c', b'd', b'e']],
+            [b'"', b'a', b' ', b'"', [b'b', b'c', b'd'], b'"', b' ', b'e', b'"'],
+            [b'a', [b'"', b' ', b'b', b'c', b' ', b' ', b'"'], b'd', b'e'],
         ]
 
         answers = [
-            ['abcde'],
-            ['a', 'bc ', 'de'],
-            [['abc'], 'de'],
-            ['a', ['bcd'], 'e'],
-            ['ab', ['cde']],
-            ['a ', ['bcd'], ' e'],
-            ['a', [' bc  '], 'de'],
+            [b'abcde'],
+            [b'a', b'bc ', b'de'],
+            [[b'abc'], b'de'],
+            [b'a', [b'bcd'], b'e'],
+            [b'ab', [b'cde']],
+            [b'a ', [b'bcd'], b' e'],
+            [b'a', [b' bc  '], b'de'],
         ]
 
         for (case, expected) in zip(cases, answers):
@@ -4073,15 +4074,15 @@ class NewFetchTests(unittest.TestCase, IMAP4HelperMixin):
         outerBody = ''
         innerBody1 = 'Contained body message text.  Squarge.'
         innerBody2 = 'Secondary <i>message</i> text of squarge body.'
-        headers = util.OrderedDict()
+        headers = collections.OrderedDict()
         headers['from'] = 'sender@host'
         headers['to'] = 'recipient@domain'
         headers['subject'] = 'booga booga boo'
         headers['content-type'] = 'multipart/alternative; boundary="xyz"'
-        innerHeaders = util.OrderedDict()
+        innerHeaders = collections.OrderedDict()
         innerHeaders['subject'] = 'this is subject text'
         innerHeaders['content-type'] = 'text/plain'
-        innerHeaders2 = util.OrderedDict()
+        innerHeaders2 = collections.OrderedDict()
         innerHeaders2['subject'] = '<b>this is subject</b>'
         innerHeaders2['content-type'] = 'text/html'
         self.msgObjs = [FakeyMessage(
@@ -4116,7 +4117,7 @@ class NewFetchTests(unittest.TestCase, IMAP4HelperMixin):
         self.messages = '1'
         parts = [1]
         outerBody = 'DA body'
-        headers = util.OrderedDict()
+        headers = collections.OrderedDict()
         headers['from'] = 'sender@host'
         headers['to'] = 'recipient@domain'
         headers['subject'] = 'booga booga boo'
@@ -4294,6 +4295,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         """
         If the search filter starts with a star, the result should be identical
         with if the filter would end with a star.
+    import pdb; pdb.set_trace()
         """
         return self._messageSetSearchTest('*:2', [2, 3, 4, 5])
 
@@ -4958,9 +4960,9 @@ class PipeliningTests(unittest.TestCase):
 
         # Here's some pipelined stuff
         self.server.dataReceived(
-            '01 FETCH 1 BODY[]\r\n'
-            '02 FETCH 2 BODY[]\r\n'
-            '03 FETCH 3 BODY[]\r\n')
+            b'01 FETCH 1 BODY[]\r\n'
+            b'02 FETCH 2 BODY[]\r\n'
+            b'03 FETCH 3 BODY[]\r\n')
 
         # Flush anything the server has scheduled to run
         while self.iterators:
@@ -4976,12 +4978,12 @@ class PipeliningTests(unittest.TestCase):
         # exceptions occurred.
         self.assertEqual(
             self.transport.value(),
-            '* 1 FETCH (BODY[] )\r\n'
-            '01 OK FETCH completed\r\n'
-            '* 2 FETCH (BODY[] )\r\n'
-            '02 OK FETCH completed\r\n'
-            '* 3 FETCH (BODY[] )\r\n'
-            '03 OK FETCH completed\r\n')
+            b'* 1 FETCH (BODY[] )\r\n'
+            b'01 OK FETCH completed\r\n'
+            b'* 2 FETCH (BODY[] )\r\n'
+            b'02 OK FETCH completed\r\n'
+            b'* 3 FETCH (BODY[] )\r\n'
+            b'03 OK FETCH completed\r\n')
 
 
 
@@ -5019,8 +5021,8 @@ class IMAP4ServerFetchTests(unittest.TestCase):
         # We need to clear out the welcome message.
         self.transport.clear()
         # Let's send out the faulty command.
-        self.server.dataReceived("0001 FETCH 1 FULLL\r\n")
-        expected = "0001 BAD Illegal syntax: Invalid Argument\r\n"
+        self.server.dataReceived(b"0001 FETCH 1 FULLL\r\n")
+        expected = b"0001 BAD Illegal syntax: Invalid Argument\r\n"
         self.assertEqual(self.transport.value(), expected)
         self.transport.clear()
         self.server.connectionLost(error.ConnectionDone("Connection closed"))
