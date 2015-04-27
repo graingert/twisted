@@ -9,6 +9,7 @@ Test case for twisted.mail.imap4
 
 import codecs
 import collections
+import io
 import locale
 import os
 from os import path as os_path
@@ -28,7 +29,7 @@ from twisted.internet.task import Clock
 from twisted.trial import unittest
 from twisted.python import util, log
 from twisted.python import failure
-from twisted.python.compat import NativeStringIO as StringIO
+from twisted.python.compat import NativeStringIO as StringIO, networkString
 
 from twisted.cred.portal import Portal
 from twisted.cred.checkers import InMemoryUsernamePasswordDatabaseDontUse
@@ -1973,7 +1974,6 @@ class AuthenticatorTests(IMAP4HelperMixin, unittest.TestCase):
         self.assertEqual(self.server.account, self.account)
 
     def testFailedLOGIN(self):
-        import pdb; pdb.triggered = True
         self.server.challengers[b'LOGIN'] = imap4.LOGINCredentials
         cAuth = imap4.LOGINAuthenticator(b'testuser')
         self.client.registerAuthenticator(cAuth)
@@ -2016,7 +2016,6 @@ class AuthenticatorTests(IMAP4HelperMixin, unittest.TestCase):
         self.assertEqual(self.server.account, self.account)
 
     def testFailedPLAIN(self):
-        import pdb; pdb.t = True
         self.server.challengers[b'PLAIN'] = imap4.PLAINCredentials
         cAuth = imap4.PLAINAuthenticator(b'testuser')
         self.client.registerAuthenticator(cAuth)
@@ -2203,7 +2202,7 @@ class ClientCapabilityTests(unittest.TestCase):
         self.transport = StringTransport()
         self.protocol = imap4.IMAP4Client()
         self.protocol.makeConnection(self.transport)
-        self.protocol.dataReceived('* OK [IMAP4rev1]\r\n')
+        self.protocol.dataReceived(b'* OK [IMAP4rev1]\r\n')
 
 
     def test_simpleAtoms(self):
@@ -2212,11 +2211,11 @@ class ClientCapabilityTests(unittest.TestCase):
         should result in a dict mapping those atoms to C{None}.
         """
         capabilitiesResult = self.protocol.getCapabilities(useCache=False)
-        self.protocol.dataReceived('* CAPABILITY IMAP4rev1 LOGINDISABLED\r\n')
-        self.protocol.dataReceived('0001 OK Capability completed.\r\n')
+        self.protocol.dataReceived(b'* CAPABILITY IMAP4rev1 LOGINDISABLED\r\n')
+        self.protocol.dataReceived(b'0001 OK Capability completed.\r\n')
         def gotCapabilities(capabilities):
             self.assertEqual(
-                capabilities, {'IMAP4rev1': None, 'LOGINDISABLED': None})
+                capabilities, {b'IMAP4rev1': None, b'LOGINDISABLED': None})
         capabilitiesResult.addCallback(gotCapabilities)
         return capabilitiesResult
 
@@ -2236,11 +2235,11 @@ class ClientCapabilityTests(unittest.TestCase):
         better API when someone does. -exarkun)
         """
         capabilitiesResult = self.protocol.getCapabilities(useCache=False)
-        self.protocol.dataReceived('* CAPABILITY IMAP4rev1 AUTH=LOGIN AUTH=PLAIN\r\n')
-        self.protocol.dataReceived('0001 OK Capability completed.\r\n')
+        self.protocol.dataReceived(b'* CAPABILITY IMAP4rev1 AUTH=LOGIN AUTH=PLAIN\r\n')
+        self.protocol.dataReceived(b'0001 OK Capability completed.\r\n')
         def gotCapabilities(capabilities):
             self.assertEqual(
-                capabilities, {'IMAP4rev1': None, 'AUTH': ['LOGIN', 'PLAIN']})
+                capabilities, {b'IMAP4rev1': None, b'AUTH': [b'LOGIN', b'PLAIN']})
         capabilitiesResult.addCallback(gotCapabilities)
         return capabilitiesResult
 
@@ -2255,12 +2254,12 @@ class ClientCapabilityTests(unittest.TestCase):
         # Exercise codepath for both orderings of =-having and =-missing
         # capabilities.
         self.protocol.dataReceived(
-            '* CAPABILITY IMAP4rev1 FOO FOO=BAR BAR=FOO BAR\r\n')
-        self.protocol.dataReceived('0001 OK Capability completed.\r\n')
+            b'* CAPABILITY IMAP4rev1 FOO FOO=BAR BAR=FOO BAR\r\n')
+        self.protocol.dataReceived(b'0001 OK Capability completed.\r\n')
         def gotCapabilities(capabilities):
-            self.assertEqual(capabilities, {'IMAP4rev1': None,
-                                            'FOO': [None, 'BAR'],
-                                            'BAR': ['FOO', None]})
+            self.assertEqual(capabilities, {b'IMAP4rev1': None,
+                                            b'FOO': [None, b'BAR'],
+                                            b'BAR': [b'FOO', None]})
         capabilitiesResult.addCallback(gotCapabilities)
         return capabilitiesResult
 
@@ -3421,7 +3420,7 @@ class FakeyMessage(util.FancyStrMixin):
         return self.date
 
     def getBodyFile(self):
-        return StringIO(self._body)
+        return io.BytesIO(self._body)
 
     def getSize(self):
         return self.size
@@ -4244,11 +4243,11 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         self.connected = defer.Deferred()
         self.client = SimpleClient(self.connected)
         self.msgObjs = [
-            FakeyMessage({}, (), '', '', 999, None),
-            FakeyMessage({}, (), '', '', 10101, None),
-            FakeyMessage({}, (), '', '', 12345, None),
-            FakeyMessage({}, (), '', '', 20001, None),
-            FakeyMessage({}, (), '', '', 20002, None),
+            FakeyMessage({}, (), b'', b'', 999, None),
+            FakeyMessage({}, (), b'', b'', 10101, None),
+            FakeyMessage({}, (), b'', b'', 12345, None),
+            FakeyMessage({}, (), b'', b'', 20001, None),
+            FakeyMessage({}, (), b'', b'', 20002, None),
         ]
 
 
@@ -4256,7 +4255,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         """
         Pretend to be a mailbox and let C{self.server} lookup messages on me.
         """
-        return zip(range(1, len(self.msgObjs) + 1), self.msgObjs)
+        return list(zip(range(1, len(self.msgObjs) + 1), self.msgObjs))
 
 
     def _messageSetSearchTest(self, queryTerms, expectedMessages):
@@ -4287,7 +4286,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         Test that a search which starts with a message set properly limits
         the search results to messages in that set.
         """
-        return self._messageSetSearchTest('1', [1])
+        return self._messageSetSearchTest(b'1', [1])
 
 
     def test_searchMessageSetWithStar(self):
@@ -4295,7 +4294,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         If the search filter ends with a star, all the message from the
         starting point are returned.
         """
-        return self._messageSetSearchTest('2:*', [2, 3, 4, 5])
+        return self._messageSetSearchTest(b'2:*', [2, 3, 4, 5])
 
 
     def test_searchMessageSetWithStarFirst(self):
@@ -4303,7 +4302,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         If the search filter starts with a star, the result should be identical
         with if the filter would end with a star.
         """
-        return self._messageSetSearchTest('*:2', [2, 3, 4, 5])
+        return self._messageSetSearchTest(b'*:2', [2, 3, 4, 5])
 
 
     def test_searchMessageSetUIDWithStar(self):
@@ -4311,7 +4310,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         If the search filter ends with a star, all the message from the
         starting point are returned (also for the SEARCH UID case).
         """
-        return self._messageSetSearchTest('UID 10000:*', [2, 3, 4, 5])
+        return self._messageSetSearchTest(b'UID 10000:*', [2, 3, 4, 5])
 
 
     def test_searchMessageSetUIDWithStarFirst(self):
@@ -4319,7 +4318,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         If the search filter starts with a star, the result should be identical
         with if the filter would end with a star (also for the SEARCH UID case).
         """
-        return self._messageSetSearchTest('UID *:10000', [2, 3, 4, 5])
+        return self._messageSetSearchTest(b'UID *:10000', [2, 3, 4, 5])
 
 
     def test_searchMessageSetUIDWithStarAndHighStart(self):
@@ -4328,7 +4327,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         the mailbox, even if its UID is less than 1234.
         """
         # in our fake mbox the highest message UID is 20002
-        return self._messageSetSearchTest('UID 30000:*', [5])
+        return self._messageSetSearchTest(b'UID 30000:*', [5])
 
 
     def test_searchMessageSetWithList(self):
@@ -4339,7 +4338,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         # 6 is bigger than the biggest message sequence number, but that's
         # okay, because N:* includes the biggest message sequence number even
         # if N is bigger than that (read the rfc nub).
-        return self._messageSetSearchTest('(6:*)', [5])
+        return self._messageSetSearchTest(b'(6:*)', [5])
 
 
     def test_searchOr(self):
@@ -4347,7 +4346,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         If the search filter contains an I{OR} term, all messages
         which match either subexpression are returned.
         """
-        return self._messageSetSearchTest('OR 1 2', [1, 2])
+        return self._messageSetSearchTest(b'OR 1 2', [1, 2])
 
 
     def test_searchOrMessageSet(self):
@@ -4357,7 +4356,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         all messages in that set are considered for inclusion in the
         results.
         """
-        return self._messageSetSearchTest('OR 2:* 2:*', [2, 3, 4, 5])
+        return self._messageSetSearchTest(b'OR 2:* 2:*', [2, 3, 4, 5])
 
 
     def test_searchNot(self):
@@ -4365,7 +4364,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         If the search filter contains a I{NOT} term, all messages
         which do not match the subexpression are returned.
         """
-        return self._messageSetSearchTest('NOT 3', [1, 2, 4, 5])
+        return self._messageSetSearchTest(b'NOT 3', [1, 2, 4, 5])
 
 
     def test_searchNotMessageSet(self):
@@ -4375,7 +4374,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         no messages in that set are considered for inclusion in the
         result.
         """
-        return self._messageSetSearchTest('NOT 2:*', [1])
+        return self._messageSetSearchTest(b'NOT 2:*', [1])
 
 
     def test_searchAndMessageSet(self):
@@ -4384,7 +4383,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         conjoined with a message sequence set wildcard, only the
         intersection of the results of each term are returned.
         """
-        return self._messageSetSearchTest('2:* 3', [3])
+        return self._messageSetSearchTest(b'2:* 3', [3])
 
     def test_searchInvalidCriteria(self):
         """
@@ -4392,7 +4391,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
         the client (resulting in an error callback), and an IllegalQueryError is
         logged on the server side.
         """
-        queryTerms = 'FOO'
+        queryTerms = b'FOO'
         def search():
             return self.client.search(queryTerms)
 
@@ -4413,7 +4412,7 @@ class DefaultSearchTests(IMAP4HelperMixin, unittest.TestCase):
 
             # Verify exception given to client has the correct message
             self.assertEqual(
-                "SEARCH failed: Invalid search command FOO", str(results))
+                b"SEARCH failed: Invalid search command FOO", str(results))
 
         d.addCallback(errorReceived)
         d.addErrback(self._ebGeneral)
@@ -4643,7 +4642,17 @@ class CopyWorkerTests(unittest.TestCase):
         f = s._IMAP4Server__cbCopy
 
         m = FakeMailbox()
-        msgs = [FakeyMessage({'Header-Counter': str(i)}, (), 'Date', 'Body %d' % (i,), i + 10, None) for i in range(1, 11)]
+        msgs = []
+        for i in range(1, 11):
+            string_i = networkString(str(i))
+            msgs.append(FakeyMessage(
+                {b'Header-Counter': string_i},
+                (),
+                b'Date',
+                b' '.join([b'Body', string_i]),
+                i + 10,
+                None,
+            ))
         d = f([im for im in zip(range(1, 11), msgs)], 'tag', m)
 
         def cbCopy(results):
@@ -4651,10 +4660,13 @@ class CopyWorkerTests(unittest.TestCase):
             for a in m.args:
                 seen.append(a[0].read())
                 self.assertEqual(a[1], ())
-                self.assertEqual(a[2], "Date")
+                self.assertEqual(a[2], b"Date")
 
             seen.sort()
-            exp = ["Header-Counter: %d\r\n\r\nBody %d" % (i, i) for i in range(1, 11)]
+            exp = []
+            for i in range(1, 11):
+                string_i = networkString(str(i))
+                exp.append(b''.join([b"Header-Counter: ", string_i, b"\r\n\r\nBody ", string_i]))
             exp.sort()
             self.assertEqual(seen, exp)
 

@@ -1056,7 +1056,6 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
             log.err(failure)
 
     def __ebAuthChunk(self, failure, tag):
-        import pdb; pdb.set_trace()
         self.sendNegativeResponse(tag, b'Authentication failed: ' + networkString(str(failure.value)))
 
     def do_STARTTLS(self, tag):
@@ -1469,7 +1468,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         else:
             # that's not the ideal way to get all messages, there should be a
             # method on mailboxes that gives you all of them
-            s = parseIdList('1:*')
+            s = parseIdList(b'1:*')
             maybeDeferred(self.mbox.fetch, s, uid=uid
                           ).addCallback(self.__cbManualSearch,
                                         tag, self.mbox, query, uid
@@ -1481,9 +1480,9 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
     def __cbSearch(self, result, tag, mbox, uid):
         if uid:
             result = map(mbox.getUID, result)
-        ids = ' '.join([str(i) for i in result])
-        self.sendUntaggedResponse('SEARCH ' + ids)
-        self.sendPositiveResponse(tag, 'SEARCH completed')
+        ids = b' '.join([networkString(str(i)) for i in result])
+        self.sendUntaggedResponse(b'SEARCH ' + ids)
+        self.sendPositiveResponse(tag, b'SEARCH completed')
 
 
     def __cbManualSearch(self, result, tag, mbox, query, uid,
@@ -1521,16 +1520,16 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         lastSequenceId = result and result[-1][0]
         lastMessageId = result and result[-1][1].getUID()
 
-        for (i, (id, msg)) in zip(range(5), result):
+        for (i, (id_, msg)) in zip(range(5), result):
             # searchFilter and singleSearchStep will mutate the query.  Dang.
             # Copy it here or else things will go poorly for subsequent
             # messages.
-            if self._searchFilter(copy.deepcopy(query), id, msg,
+            if self._searchFilter(copy.deepcopy(query), id_, msg,
                                   lastSequenceId, lastMessageId):
                 if uid:
-                    searchResults.append(str(msg.getUID()))
+                    searchResults.append(networkString(str(msg.getUID())))
                 else:
-                    searchResults.append(str(id))
+                    searchResults.append(networkString(str(id_)))
         if i == 4:
             from twisted.internet import reactor
             reactor.callLater(
@@ -1538,8 +1537,8 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
                 searchResults)
         else:
             if searchResults:
-                self.sendUntaggedResponse('SEARCH ' + ' '.join(searchResults))
-            self.sendPositiveResponse(tag, 'SEARCH completed')
+                self.sendUntaggedResponse(b'SEARCH ' + b' '.join(searchResults))
+            self.sendPositiveResponse(tag, b'SEARCH completed')
 
 
     def _searchFilter(self, query, id, msg, lastSequenceId, lastMessageId):
@@ -1883,7 +1882,7 @@ class IMAP4Server(basic.LineReceiver, policies.TimeoutMixin):
         return '\\Seen' not in msg.getFlags()
 
     def __ebSearch(self, failure, tag):
-        self.sendBadResponse(tag, 'SEARCH failed: ' + str(failure.value))
+        self.sendBadResponse(tag, b'SEARCH failed: ' + networkString(str(failure.value)))
         log.err(failure)
 
     def do_FETCH(self, tag, messages, query, uid=0):
@@ -4017,16 +4016,16 @@ def parseIdList(s, lastMessageId=None):
     @return: A C{MessageSet} that contains the ids defined in the list
     """
     res = MessageSet()
-    parts = s.split(',')
+    parts = s.split(b',')
     for p in parts:
-        if ':' in p:
-            low, high = p.split(':', 1)
+        if b':' in p:
+            low, high = p.split(b':', 1)
             try:
-                if low == '*':
+                if low == b'*':
                     low = None
                 else:
                     low = long(low)
-                if high == '*':
+                if high == b'*':
                     high = None
                 else:
                     high = long(high)
@@ -4042,14 +4041,16 @@ def parseIdList(s, lastMessageId=None):
                 low = low or lastMessageId
 
                 # RFC says that 2:4 and 4:2 are equivalent
-                if low > high:
+                # Treat None as lowest
+                if (low is None) or (high is not None and low > high):
                     low, high = high, low
+
                 res.extend((low, high))
             except ValueError:
                 raise IllegalIdentifierError(p)
         else:
             try:
-                if p == '*':
+                if p == b'*':
                     p = None
                 else:
                     p = long(p)
@@ -5697,9 +5698,9 @@ class ICloseableMailbox(Interface):
         """
 
 def _formatHeaders(headers):
-    hdrs = [': '.join((k.title(), '\r\n'.join(v.splitlines()))) for (k, v)
+    hdrs = [b': '.join((k.title(), b'\r\n'.join(v.splitlines()))) for (k, v)
             in iteritems(headers)]
-    hdrs = '\r\n'.join(hdrs) + '\r\n'
+    hdrs = b'\r\n'.join(hdrs) + b'\r\n'
     return hdrs
 
 def subparts(m):
@@ -5769,27 +5770,31 @@ class MessageProducer:
         headers = self.msg.getHeaders(True)
         boundary = None
         if self.msg.isMultipart():
-            content = headers.get('content-type')
-            parts = [x.split('=', 1) for x in content.split(';')[1:]]
+            content = headers.get(b'content-type')
+            parts = [x.split(b'=', 1) for x in content.split(b';')[1:]]
             parts = dict([(k.lower().strip(), v) for (k, v) in parts])
-            boundary = parts.get('boundary')
+            boundary = parts.get(b'boundary')
             if boundary is None:
                 # Bastards
-                boundary = '----=_%f_boundary_%f' % (time.time(), random.random())
-                headers['content-type'] += '; boundary="%s"' % (boundary,)
+                boundary = networkString('----=_%f_boundary_%f' % (time.time(), random.random()))
+                headers[b'content-type'] += b''.join([b'; boundary="', boundary, '"'])
             else:
-                if boundary.startswith('"') and boundary.endswith('"'):
+                if boundary.startswith(b'"') and boundary.endswith(b'"'):
                     boundary = boundary[1:-1]
 
         self.write(_formatHeaders(headers))
-        self.write('\r\n')
+        self.write(b'\r\n')
         if self.msg.isMultipart():
             for p in subparts(self.msg):
-                self.write('\r\n--%s\r\n' % (boundary,))
+                self.write(b'\r\n--')
+                self.write(boundary)
+                self.write(b'\r\n')
                 yield MessageProducer(p, self.buffer, self.scheduler
                     ).beginProducing(None
                     )
-            self.write('\r\n--%s--\r\n' % (boundary,))
+            self.write(b'\r\n--')
+            self.write(boundary)
+            self.write(b'--\r\n')
         else:
             f = self.msg.getBodyFile()
             while True:
