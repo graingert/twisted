@@ -974,7 +974,7 @@ class AddCleanupMixin:
         self.test.run(self.result)
         self.assertEqual(["setUp", "runTest", "foo", "bar", "tearDown"], self.test.log)
 
-    def test_cleanupsIgnoreKeyboardInterrupt(self):
+    def test_cleanupsHandleKeyboardInterrupt(self):
         self.test.addCleanup(self.test.append, "foo")
 
         @self.test.addCleanup
