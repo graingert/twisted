@@ -965,6 +965,28 @@ class AddCleanupMixin:
         self.assertEqual(error2.getErrorMessage(), "foo")
 
 
+    def test_cleanupsAreReentrant(self):
+        @self.test.addCleanup
+        def reenter():
+            self.test.append("foo")
+            self.test.addCleanup(self.test.append, "bar")
+
+        self.test.run(self.result)
+        self.assertEqual(["setUp", "runTest", "foo", "bar", "tearDown"], self.test.log)
+
+    def test_cleanupsIgnoreKeyboardInterrupt(self):
+        self.test.addCleanup(self.test.append, "foo")
+
+        @self.test.addCleanup
+        def ctrlc():
+            raise KeyboardInterrupt
+
+        self.test.addCleanup(self.test.append, "bar")
+
+        self.test.run(self.result)
+        self.assertEqual(["setUp", "runTest", "bar", "foo", "tearDown"], self.test.log)
+
+
 class SynchronousAddCleanupTests(AddCleanupMixin, unittest.SynchronousTestCase):
     """
     Test the addCleanup method of TestCase in the synchronous case
