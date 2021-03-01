@@ -1089,7 +1089,7 @@ class CommandLocator:
         metaclass.
         """
 
-        _currentClassCommands: List[Tuple[Command, Callable]] = []
+        _currentClassCommands: "List[Tuple[Command, Callable]]" = []
 
         def __new__(cls, name, bases, attrs):
             commands = cls._currentClassCommands[:]
@@ -1798,7 +1798,7 @@ class Command:
     errors: Dict[Type[Exception], bytes] = {}
     fatalErrors: Dict[Type[Exception], bytes] = {}
 
-    commandType: Union[Type[Command], Type[Box]] = Box
+    commandType: "Union[Type[Command], Type[Box]]" = Box
     responseType: Type[AmpBox] = Box
 
     requiresAnswer = True
