@@ -616,7 +616,7 @@ class AmpBox(dict):
 
     # be like a regular dictionary don't magically
     # acquire a __dict__...
-    __slots__ = []  # type: List[str]
+    __slots__: List[str] = []
 
     def __init__(self, *args, **kw):
         """
@@ -712,7 +712,7 @@ class QuitBox(AmpBox):
     I am an AmpBox that, upon being sent, terminates the connection.
     """
 
-    __slots__ = []  # type: List[str]
+    __slots__: List[str] = []
 
     def __repr__(self) -> str:
         return f"QuitBox(**{super().__repr__()})"
@@ -1089,7 +1089,7 @@ class CommandLocator:
         metaclass.
         """
 
-        _currentClassCommands = []  # type: List[Tuple[Command, Callable]]
+        _currentClassCommands: List[Tuple[Command, Callable]] = []
 
         def __new__(cls, name, bases, attrs):
             commands = cls._currentClassCommands[:]
@@ -1764,8 +1764,8 @@ class Command:
                         f"Response names must be byte strings, got: {name!r}"
                     )
 
-            errors = {}  # type: Dict[Type[Exception], bytes]
-            fatalErrors = {}  # type: Dict[Type[Exception], bytes]
+            errors: Dict[Type[Exception], bytes] = {}
+            fatalErrors: Dict[Type[Exception], bytes] = {}
             accumulateClassDict(newtype, "errors", errors)
             accumulateClassDict(newtype, "fatalErrors", fatalErrors)
 
@@ -1792,14 +1792,14 @@ class Command:
 
             return newtype
 
-    arguments = []  # type: List[Tuple[bytes, Argument]]
-    response = []  # type: List[Tuple[bytes, Argument]]
-    extra = []  # type: List[Any]
-    errors = {}  # type: Dict[Type[Exception], bytes]
-    fatalErrors = {}  # type: Dict[Type[Exception], bytes]
+    arguments: List[Tuple[bytes, Argument]] = []
+    response: List[Tuple[bytes, Argument]] = []
+    extra: List[Any] = []
+    errors: Dict[Type[Exception], bytes] = {}
+    fatalErrors: Dict[Type[Exception], bytes] = {}
 
-    commandType = Box  # type: Union[Type[Command], Type[Box]]
-    responseType = Box  # type: Type[AmpBox]
+    commandType: Union[Type[Command], Type[Box]] = Box
+    responseType: Type[AmpBox] = Box
 
     requiresAnswer = True
 
@@ -2039,7 +2039,7 @@ class _TLSBox(AmpBox):
     I am an AmpBox that, upon being sent, initiates a TLS connection.
     """
 
-    __slots__ = []  # type: List[str]
+    __slots__: List[str] = []
 
     def __init__(self):
         if ssl is None:
@@ -2293,7 +2293,7 @@ class BinaryBoxProtocol(
 
     hostCertificate = None
     noPeerCertificate = False  # for tests
-    innerProtocol = None  # type: Optional[Protocol]
+    innerProtocol: Optional[Protocol] = None
     innerProtocolClientFactory = None
 
     def __init__(self, boxReceiver):
