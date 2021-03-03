@@ -1403,7 +1403,7 @@ class _CancellationStatus:
 
 
 @failure._extraneous
-def _inlineCallbacks(result, g, status):
+def _inlineCallbacks(result, g, status, current_context=None):
     """
     Carry out the work of L{inlineCallbacks}.
 
@@ -1430,7 +1430,8 @@ def _inlineCallbacks(result, g, status):
     waiting = [True, None]  # waiting for result?  # result
 
     # Get the current contextvars Context object.
-    current_context = _copy_context()
+    if current_context is None:
+        current_context = _copy_context()
 
     while 1:
         try:
@@ -1509,7 +1510,7 @@ def _inlineCallbacks(result, g, status):
                     waiting[0] = False
                     waiting[1] = r
                 else:
-                    current_context.run(_inlineCallbacks, r, g, status)
+                    _inlineCallbacks(r, g, status, current_context)
 
             result.addBoth(gotResult)
             if waiting[0]:
