@@ -2624,7 +2624,32 @@ class AbortingThenLosingClient(AbortingClient):
         self.transport.loseConnection()
 
 
-class ProducerAbortingClient(ConnectableProtocol):
+class _PeerAbortingClient(ConnectableProtocol):
+    """
+    A client that aborts its own connection and then makes sure its peer
+    observes the disconnect.
+
+    macOS does not reliably deliver the RST of an C{abortConnection()} on a
+    quiescent connection, so a peer that is merely waiting to be told the
+    connection died can hang forever. To keep these tests deterministic without
+    depending on that OS behaviour, we lose the peer's connection directly. Its
+    producer is unregistered first because C{loseConnection()} on a transport
+    with a paused pull-producer never completes (C{doWrite} keeps resuming the
+    producer instead of closing). The peer disconnects with C{ConnectionDone},
+    which C{runAbortTest} already accepts.
+    """
+
+    def connectionLost(self, reason):
+        peer = self.otherProtocol.transport
+        # peer is None when it already noticed the disconnect over the socket
+        # and tore itself down first (the fast path); nothing to do then.
+        if peer is not None:
+            peer.unregisterProducer()
+            peer.loseConnection()
+        super().connectionLost(reason)
+
+
+class ProducerAbortingClient(_PeerAbortingClient):
     """
     Call abortConnection from doWrite, via resumeProducing.
     """
@@ -2655,10 +2680,10 @@ class ProducerAbortingClient(ConnectableProtocol):
             raise RuntimeError("BUG: stopProducing() was never called.")
         if self.inReactorMethod:
             raise RuntimeError("BUG: connectionLost called re-entrantly!")
-        ConnectableProtocol.connectionLost(self, reason)
+        super().connectionLost(reason)
 
 
-class StreamingProducerClient(ConnectableProtocol):
+class StreamingProducerClient(_PeerAbortingClient):
     """
     Call abortConnection() when the other side has stopped reading.
 
@@ -2720,11 +2745,6 @@ class StreamingProducerClient(ConnectableProtocol):
         self.inReactorMethod = True
         self.transport.abortConnection()
         self.inReactorMethod = False
-
-    def connectionLost(self, reason):
-        # Tell server to start reading again so it knows to go away:
-        self.otherProtocol.transport.startReading()
-        ConnectableProtocol.connectionLost(self, reason)
 
 
 class StreamingProducerClientLater(StreamingProducerClient):
@@ -2878,12 +2898,6 @@ class AbortConnectionMixin:
             clientConnectionLostReason=ConnectionLost,
         )
 
-    # This test is flaky on macOS on Azure and we skip it due to lack of active macOS developers.
-    # If you care about Twisted on macOS, consider enabling this tests and find out why we get random failures.
-    @skipIf(
-        os.environ.get("CI", "").lower() == "true" and platform.isMacOSX(),
-        "Flaky on macOS on Azure.",
-    )
     def test_resumeProducingAbort(self):
         """
         abortConnection() is called in resumeProducing, before any bytes have
@@ -2892,12 +2906,6 @@ class AbortConnectionMixin:
         """
         self.runAbortTest(ProducerAbortingClient, ConnectableProtocol)
 
-    # This test is flaky on macOS on Azure and we skip it due to lack of active macOS developers.
-    # If you care about Twisted on macOS, consider enabling this tests and find out why we get random failures.
-    @skipIf(
-        os.environ.get("CI", "").lower() == "true" and platform.isMacOSX(),
-        "Flaky on macOS on Azure.",
-    )
     def test_resumeProducingAbortLater(self):
         """
         abortConnection() is called in resumeProducing, after some

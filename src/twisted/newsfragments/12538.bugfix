@@ -1,0 +1,1 @@
+twisted.internet.test.test_tcp.AbortConnectionTests producer/abort tests are no longer flaky on macOS (they could hang because macOS does not reliably deliver the RST of an abortConnection() on a quiescent connection), and test_resumeProducingAbort and test_resumeProducingAbortLater are no longer skipped there.
