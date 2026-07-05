@@ -2556,14 +2556,31 @@ def _dumpServerState(server):
         peek = "EOF" if d == b"" else f"{len(d)}b"
     except OSError as e:
         peek = errno.errorcode.get(e.args[0], str(e.args[0]))
+    sn = skt.getsockname()[1]
     try:
-        peer = "connected" + str(skt.getpeername()[1])
+        pn = skt.getpeername()[1]
+        peer = f"connected{pn}"
     except OSError as e:
+        pn = None
         peer = "peererr:" + errno.errorcode.get(e.args[0], str(e.args[0]))
     _rstlog(
         f"HANGDUMP reactor={type(reactor).__name__} fd={fd} inReaders={inReaders} "
         f"inWriters={inWriters} {sel} SO_ERROR={so} MSG_PEEK={peek} {peer}"
     )
+    # OS truth: how many endpoints still hold this connection open? If the
+    # client fd is still listed, close() left a lingering fd; if only the
+    # server end appears, the client closed but no RST/FIN reached the peer.
+    try:
+        import subprocess
+
+        out = subprocess.run(
+            ["lsof", "-nP", "-iTCP"], capture_output=True, text=True, timeout=8
+        ).stdout
+        wanted = {str(sn)} | ({str(pn)} if pn else set())
+        hits = [l for l in out.splitlines() if any(w in l for w in wanted)]
+        _rstlog("LSOF %d<->%s:\n%s" % (sn, pn, "\n".join(hits) or "(none)"))
+    except Exception as e:
+        _rstlog(f"LSOF err: {e!r}")
 
 
 class NoReadServer(ConnectableProtocol):

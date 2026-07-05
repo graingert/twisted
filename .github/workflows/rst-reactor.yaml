@@ -33,8 +33,6 @@ jobs:
           set +e
           rm -f /tmp/rst_reactor
           TESTS="
-            twisted.internet.test.test_tcp.AbortConnectionTests_SelectReactorTests.test_fullWriteBuffer
-            twisted.internet.test.test_tcp.AbortConnectionTests_SelectReactorTests.test_fullWriteBufferAfterByteExchange
             twisted.internet.test.test_tcp.AbortConnectionTests_AsyncioSelectorReactorTests.test_fullWriteBuffer
             twisted.internet.test.test_tcp.AbortConnectionTests_AsyncioSelectorReactorTests.test_fullWriteBufferAfterByteExchange
           "
