@@ -179,6 +179,31 @@ class _SocketCloser:
 
         except OSError:
             pass
+        if _RSTREACTOR and not orderly:
+            # Probe the client socket's state at abort-close: if it's
+            # {1,0}-lingered, still connected, with unsent bytes, close() must
+            # emit a RST per spec.
+            try:
+                ln = skt.getsockname()[1]
+                try:
+                    pn = str(skt.getpeername()[1])
+                except OSError as e:
+                    pn = "err" + str(e.args[0])
+                lg = struct.unpack(
+                    "ii", skt.getsockopt(socket.SOL_SOCKET, socket.SO_LINGER, 8)
+                )
+                se = skt.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+                try:
+                    nw = skt.getsockopt(socket.SOL_SOCKET, 0x1024)  # SO_NWRITE (Darwin)
+                except OSError:
+                    nw = -1
+                with open("/tmp/rst_reactor", "a") as _f:
+                    _f.write(
+                        f"CLOSING {ln}->{pn} linger={lg} SO_ERROR={se} SO_NWRITE={nw}\n"
+                    )
+            except Exception as _e:
+                with open("/tmp/rst_reactor", "a") as _f:
+                    _f.write(f"CLOSING probe err: {_e!r}\n")
         try:
             skt.close()
         except OSError as e:
