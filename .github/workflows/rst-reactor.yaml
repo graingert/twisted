@@ -1,0 +1,50 @@
+name: rst-reactor
+
+# Throwaway: reproduce the real abort hang on macOS and dump the reactor's view
+# of the hung server connection (is its fd still armed? is the socket reset?),
+# to pin the mechanism without packet capture.
+on:
+  push:
+    branches: [rst-reactor]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reactor:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e ".[osx-platform]"
+      - name: hammer + dump reactor state at each hang
+        env:
+          RSTREACTOR: "1"
+          ABORT_PROBE_TIMEOUT: "8"
+        run: |
+          set +e
+          rm -f /tmp/rst_reactor
+          TESTS="
+            twisted.internet.test.test_tcp.AbortConnectionTests_SelectReactorTests.test_fullWriteBuffer
+            twisted.internet.test.test_tcp.AbortConnectionTests_SelectReactorTests.test_fullWriteBufferAfterByteExchange
+            twisted.internet.test.test_tcp.AbortConnectionTests_AsyncioSelectorReactorTests.test_fullWriteBuffer
+            twisted.internet.test.test_tcp.AbortConnectionTests_AsyncioSelectorReactorTests.test_fullWriteBufferAfterByteExchange
+          "
+          python -m twisted.trial -u $TESTS > /tmp/trial.log 2>&1 &
+          RUNPID=$!
+          ( sleep 300; kill -KILL "$RUNPID" 2>/dev/null ) &
+          wait "$RUNPID"
+          hangs=$(grep -c "reactor still running after" /tmp/trial.log)
+          passes=$(grep -c "Test Pass" /tmp/trial.log)
+          echo "SUMMARY: passes=$passes hangs=$hangs"
+          echo "=== reactor state at each hang ==="
+          cat /tmp/rst_reactor 2>/dev/null || echo "(none captured)"
+          exit 0

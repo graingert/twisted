@@ -111,6 +111,10 @@ from twisted.python.util import untilConcludes
 # Not all platforms have, or support, this flag.
 _AI_NUMERICSERV = getattr(socket, "AI_NUMERICSERV", 0)
 
+# RST-REACTOR (throwaway): note if an abortive close() raises (which would
+# leave the connection open and explain a peer that never sees the abort).
+_RSTREACTOR = os.environ.get("RSTREACTOR")
+
 
 def _getrealname(addr):
     """
@@ -177,8 +181,10 @@ class _SocketCloser:
             pass
         try:
             skt.close()
-        except OSError:
-            pass
+        except OSError as e:
+            if _RSTREACTOR and not orderly:
+                with open("/tmp/rst_reactor", "a") as _f:
+                    _f.write(f"ABORTIVE close() RAISED: {e!r}\n")
 
 
 class _AbortingMixin:

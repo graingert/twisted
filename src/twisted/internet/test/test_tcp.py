@@ -2518,6 +2518,54 @@ class ReadAbortServerProtocol(AbortServerWritingProtocol):
             raise Exception("Unexpectedly received data.")
 
 
+# RST-REACTOR (throwaway): dump the reactor's view of a hung server connection.
+_RSTREACTOR = os.environ.get("RSTREACTOR")
+
+
+def _rstlog(msg):
+    with open("/tmp/rst_reactor", "a") as _f:
+        _f.write(msg + "\n")
+
+
+def _dumpServerState(server):
+    if server.disconnectReason is not None:
+        return  # delivered before the watchdog fired
+    import select as _sel
+
+    reactor = server.reactor
+    transport = getattr(server, "transport", None)
+    try:
+        skt = transport.getHandle()
+        fd = skt.fileno()
+    except Exception as e:
+        _rstlog(f"HANGDUMP transport gone: {e!r}")
+        return
+    inReaders = transport in reactor.getReaders()
+    inWriters = transport in reactor.getWriters()
+    try:
+        r, _w, x = _sel.select([fd], [], [fd], 0)
+        sel = f"readable={bool(r)} exceptional={bool(x)}"
+    except Exception as e:
+        sel = f"selecterr={e!r}"
+    try:
+        so = skt.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+    except OSError as e:
+        so = f"err{e.args[0]}"
+    try:
+        d = skt.recv(1, socket.MSG_PEEK)
+        peek = "EOF" if d == b"" else f"{len(d)}b"
+    except OSError as e:
+        peek = errno.errorcode.get(e.args[0], str(e.args[0]))
+    try:
+        peer = "connected" + str(skt.getpeername()[1])
+    except OSError as e:
+        peer = "peererr:" + errno.errorcode.get(e.args[0], str(e.args[0]))
+    _rstlog(
+        f"HANGDUMP reactor={type(reactor).__name__} fd={fd} inReaders={inReaders} "
+        f"inWriters={inWriters} {sel} SO_ERROR={so} MSG_PEEK={peek} {peer}"
+    )
+
+
 class NoReadServer(ConnectableProtocol):
     """
     Stop reading immediately on connection.
@@ -2528,6 +2576,12 @@ class NoReadServer(ConnectableProtocol):
 
     def connectionMade(self):
         self.transport.stopReading()
+
+    def connectionLost(self, reason):
+        _hd = getattr(self, "_hangdump", None)
+        if _hd is not None and _hd.active():
+            _hd.cancel()
+        super().connectionLost(reason)
 
 
 class EventualNoReadServer(ConnectableProtocol):
@@ -2558,6 +2612,12 @@ class EventualNoReadServer(ConnectableProtocol):
 
     def stopProducing(self):
         pass
+
+    def connectionLost(self, reason):
+        _hd = getattr(self, "_hangdump", None)
+        if _hd is not None and _hd.active():
+            _hd.cancel()
+        super().connectionLost(reason)
 
 
 class BaseAbortingClient(ConnectableProtocol):
@@ -2722,9 +2782,12 @@ class StreamingProducerClient(ConnectableProtocol):
         self.inReactorMethod = False
 
     def connectionLost(self, reason):
+        if _RSTREACTOR:
+            srv = self.otherProtocol
+            srv._hangdump = self.reactor.callLater(3, _dumpServerState, srv)
         # Tell server to start reading again so it knows to go away:
         self.otherProtocol.transport.startReading()
-        ConnectableProtocol.connectionLost(self, reason)
+        super().connectionLost(reason)
 
 
 class StreamingProducerClientLater(StreamingProducerClient):

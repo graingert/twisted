@@ -8,6 +8,7 @@ Various helpers for tests for connection-oriented transports.
 
 from __future__ import annotations
 
+import os
 import socket
 from gc import collect
 from weakref import ref
@@ -174,7 +175,11 @@ def runProtocolsWithReactor(
     d.addErrback(failed)
     d.addCallback(lambda _: needsRunningReactor(reactor, reactor.stop))
 
-    reactorBuilder.runReactor(reactor)
+    _t = os.environ.get("ABORT_PROBE_TIMEOUT")
+    if _t is not None:
+        reactorBuilder.runReactor(reactor, timeout=float(_t))
+    else:
+        reactorBuilder.runReactor(reactor)
     return reactor
 
 
