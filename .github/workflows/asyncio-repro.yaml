@@ -1,0 +1,26 @@
+name: asyncio-repro
+
+# Throwaway: reproduce the abort half-open hang with PURE asyncio (no Twisted),
+# using only the low-level loop fd APIs the reactor uses.
+on:
+  push:
+    branches: [asyncio-repro]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repro:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python3 asyncio_repro.py || true
